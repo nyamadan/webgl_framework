@@ -1,9 +1,9 @@
 import 'dart:html';
 
-import "teapot_renderer.dart";
+import "mmd_renderer.dart";
 
 void main() {
-  var renderer = new TeapotRenderer();
+  var renderer = new MMD_Renderer();
 
   document.querySelector("body").append(renderer.dom);
 
