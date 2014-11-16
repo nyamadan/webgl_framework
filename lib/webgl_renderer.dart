@@ -127,8 +127,35 @@ abstract class WebGLRenderer
     return new WebGLArrayBuffer(this.createVBO(data), data);
   }
 
-  WebGLCanvasTexture createCanvasTexture() {
-    return new WebGLCanvasTexture(gl);
+  WebGLCanvasTexture createCanvasTexture({int width : 32, int height : 32, Vector4 color : null}) {
+    var canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+
+    var ctx = canvas.getContext("2d");
+    if(color != null) {
+      int r = (Math.min(Math.max(color.r, 0.0), 1.0) * 0xff).toInt();
+      int g = (Math.min(Math.max(color.g, 0.0), 1.0) * 0xff).toInt();
+      int b = (Math.min(Math.max(color.b, 0.0), 1.0) * 0xff).toInt();
+      num a = Math.min(Math.max(color.a, 0.0), 1.0);
+
+      var fillStyle_orig = ctx.fillStyle;
+      ctx.setFillColorRgb(r, g, b, a);
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = fillStyle_orig;
+    }
+
+    var texture = gl.createTexture();
+    gl.bindTexture(GL.TEXTURE_2D, texture);
+    gl.pixelStorei(GL.UNPACK_FLIP_Y_WEBGL, 1);
+    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE);
+    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE);
+    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.LINEAR);
+    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.LINEAR);
+    gl.texImage2DCanvas(GL.TEXTURE_2D, 0, GL.RGBA, GL.RGBA, GL.UNSIGNED_BYTE, canvas);
+    gl.bindTexture(GL.TEXTURE_2D, null);
+
+    return new WebGLCanvasTexture(texture, canvas, ctx);
   }
 
   void bindTexture2D(WebGLCanvasTexture texture) {
