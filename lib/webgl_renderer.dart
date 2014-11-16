@@ -147,7 +147,6 @@ abstract class WebGLRenderer
 
     var texture = gl.createTexture();
     gl.bindTexture(GL.TEXTURE_2D, texture);
-    gl.pixelStorei(GL.UNPACK_FLIP_Y_WEBGL, 1);
     gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE);
     gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE);
     gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.LINEAR);
@@ -162,8 +161,48 @@ abstract class WebGLRenderer
     gl.bindTexture(GL.TEXTURE_2D, texture.texture);
   }
 
-  Future<WebGLCanvasTexture> loadCanvasTexture(WebGLCanvasTexture texture, String uri) {
-    return texture.load(gl, uri);
+  Future<WebGLCanvasTexture> loadCanvasTexture(WebGLCanvasTexture texture, String uri, {bool flip_y: false}) {
+    var completer = new Completer<WebGLCanvasTexture>();
+    var future = completer.future;
+
+    ImageElement image = document.createElement("img");
+    image.onLoad.listen((event){
+      bool isPowerOfTwo(int x) => (x & (x - 1)) == 0x00;
+      int nextHighestPowerOfTwo(int x) {
+        --x;
+        for(int i = 1; i < 32; i <<= 1) {
+          x = x | x >> i;
+        }
+        return x + 1;
+      }
+
+      if(isPowerOfTwo(image.width) && isPowerOfTwo(image.height)) {
+        texture.canvas.width = image.width;
+        texture.canvas.height = image.height;
+      } else {
+        texture.canvas.width = nextHighestPowerOfTwo(image.width);
+        texture.canvas.height = nextHighestPowerOfTwo(image.height);
+      }
+
+      texture.ctx.drawImage(image, 0, 0);
+
+      gl.bindTexture(GL.TEXTURE_2D, texture.texture);
+
+      if(flip_y) {
+        gl.pixelStorei(GL.UNPACK_FLIP_Y_WEBGL, 1);
+      } else {
+        gl.pixelStorei(GL.UNPACK_FLIP_Y_WEBGL, 0);
+      }
+      gl.texImage2DCanvas(GL.TEXTURE_2D, 0, GL.RGBA, GL.RGBA, GL.UNSIGNED_BYTE, texture.canvas);
+      gl.generateMipmap(GL.TEXTURE_2D);
+      gl.bindTexture(GL.TEXTURE_2D, null);
+
+      completer.complete(texture);
+    });
+
+    image.src = uri;
+
+    return future;
   }
 
   Map<String, GL.UniformLocation> getUniformLocations(GL.Program program, List<String> uniform_names) {
