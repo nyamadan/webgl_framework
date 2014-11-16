@@ -131,6 +131,10 @@ abstract class WebGLRenderer
     return new WebGLCanvasTexture(gl);
   }
 
+  void bindTexture2D(WebGLCanvasTexture texture) {
+    gl.bindTexture(GL.TEXTURE_2D, texture.texture);
+  }
+
   Future<WebGLCanvasTexture> loadCanvasTexture(WebGLCanvasTexture texture, String uri) {
     return texture.load(gl, uri);
   }
