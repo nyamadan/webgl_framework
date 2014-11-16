@@ -217,8 +217,8 @@ class MMD_Model {
       int v2 = view.getUint16(offset, Endianness.LITTLE_ENDIAN);
       offset += 2;
 
-      this.triangles[i + 0] = v0;
-      this.triangles[i + 1] = v1;
+      this.triangles[i + 0] = v1;
+      this.triangles[i + 1] = v0;
       this.triangles[i + 2] = v2;
     }
 
@@ -230,7 +230,7 @@ class MMD_Model {
     offset += 4;
 
     this.materials = new List<MMD_Material>();
-    for(int i = 0; i < length; i += 3) {
+    for(int i = 0; i < length; i++) {
       var material = new MMD_Material();
 
       var diffuse = new Vector3.zero();
@@ -434,8 +434,13 @@ class MMD_Renderer extends WebGLRenderer {
     Vector3 look_from = new Vector3(0.0, 0.0, 25.0 + 25.0 * this.trackball_value);
     setViewMatrix(view, look_from, new Vector3(0.0, 0.0, 0.0), new Vector3(0.0, 1.0, 0.0));
 
-    Matrix4 model = new Matrix4.identity();
-    model.setRotation(this.trackball_rotation.asRotationMatrix());
+    Matrix4 rh = new Matrix4.identity();
+    rh.storage[10] = -1.0;
+
+    Matrix4 rot = new Matrix4.identity();
+    rot.setRotation(this.trackball_rotation.asRotationMatrix());
+
+    Matrix4 model = rot * rh;
 
     Matrix4 mvp = projection * view * model;
 
