@@ -101,11 +101,21 @@ class MMD_Model {
 
   Float32List createNormalList() {
     Float32List normal_list = new Float32List(this.vertices.length * 3);
-    for(int i = 0; i < this.vertices.length; i += 3) {
+    for(int i = 0; i < this.vertices.length; i++) {
       var normal = this.vertices[i].normal;
       normal_list[i * 3 + 0] = normal.x;
       normal_list[i * 3 + 1] = normal.y;
       normal_list[i * 3 + 2] = normal.z;
+    }
+    return normal_list;
+  }
+
+  Float32List createCoordList() {
+    Float32List normal_list = new Float32List(this.vertices.length * 2);
+    for(int i = 0; i < this.vertices.length; i++) {
+      var coord = this.vertices[i].coord;
+      normal_list[i * 2 + 0] = coord.x;
+      normal_list[i * 2 + 1] = coord.y;
     }
     return normal_list;
   }
@@ -207,8 +217,8 @@ class MMD_Model {
       int v2 = view.getUint16(offset, Endianness.LITTLE_ENDIAN);
       offset += 2;
 
-      this.triangles[i + 0] = v1;
-      this.triangles[i + 1] = v0;
+      this.triangles[i + 0] = v0;
+      this.triangles[i + 1] = v1;
       this.triangles[i + 2] = v2;
     }
 
@@ -284,12 +294,15 @@ class MMD_Renderer extends WebGLRenderer {
   """
   attribute vec3 position;
   attribute vec3 normal;
+  attribute vec2 coord;
   uniform mat4 mvp_matrix;
 
   varying vec3 v_normal;
+  varying vec2 v_coord;
 
   void main(void){
     v_normal = normal;
+    v_coord = coord;
     gl_Position = mvp_matrix * vec4(position, 1.0);
   }
   """;
@@ -299,10 +312,17 @@ class MMD_Renderer extends WebGLRenderer {
   precision mediump float;
 
   uniform vec4 diffuse;
+  uniform sampler2D texture;
+
   varying vec3 v_normal;
+  varying vec2 v_coord;
 
   void main(void){
-    gl_FragColor = diffuse;
+    vec4 tex_color = texture2D(texture, v_coord);
+
+    float d = clamp(dot(v_normal, vec3(0.0, 0.0, -1.0)), 0.0, 1.0);
+    d = (d * d) * 0.5 + 0.5;
+    gl_FragColor = vec4(diffuse.rgb * tex_color.rgb * d, diffuse.a);
   }
   """;
 
@@ -313,8 +333,10 @@ class MMD_Renderer extends WebGLRenderer {
 
   WebGLArrayBuffer position_buffer;
   WebGLArrayBuffer normal_buffer;
+  WebGLArrayBuffer coord_buffer;
   List<WebGLElementArrayBuffer> index_buffer_list;
   Map<String, WebGLCanvasTexture> textures;
+  WebGLCanvasTexture white_texture;
 
   MMD_Model pmd;
 
@@ -329,10 +351,12 @@ class MMD_Renderer extends WebGLRenderer {
     this.attributes = this.getAttributes(this.program, [
       "position",
       "normal",
+      "coord",
     ]);
 
     this.uniforms = this.getUniformLocations(this.program, [
       "diffuse",
+      "texture",
       "mvp_matrix",
     ]);
 
@@ -340,7 +364,7 @@ class MMD_Renderer extends WebGLRenderer {
     gl.depthFunc(GL.LEQUAL);
 
     gl.enable(GL.CULL_FACE);
-    gl.frontFace(GL.CW);
+    gl.frontFace(GL.CCW);
 
     gl.clearColor(0.5, 0.5, 0.5, 1.0);
     gl.useProgram(this.program);
@@ -353,6 +377,12 @@ class MMD_Renderer extends WebGLRenderer {
       gl.enableVertexAttribArray(this.attributes["normal"]);
     }
 
+    if (this.attributes.containsKey("coord")) {
+      gl.enableVertexAttribArray(this.attributes["coord"]);
+    }
+
+    gl.activeTexture(GL.TEXTURE0);
+
     this._load();
   }
 
@@ -362,12 +392,19 @@ class MMD_Renderer extends WebGLRenderer {
     .then((MMD_Model pmd){
       var position_list = pmd.createPositionList();
       var normal_list = pmd.createNormalList();
+      var coord_list = pmd.createCoordList();
 
       this.position_buffer = this.createArrayBuffer(position_list);
       this.normal_buffer = this.createArrayBuffer(normal_list);
+      this.coord_buffer = this.createArrayBuffer(coord_list);
 
       this.index_buffer_list = new List<WebGLElementArrayBuffer>.generate(pmd.materials.length,
         (int i) => this.createElementArrayBuffer(pmd.createTriangleList(i))
+      );
+
+      this.white_texture = this.createCanvasTexture(
+        width : 16, height : 16,
+        color : new Vector4(1.0, 1.0, 1.0, 1.0)
       );
 
       this.textures = new Map<String, WebGLCanvasTexture>();
@@ -377,9 +414,8 @@ class MMD_Renderer extends WebGLRenderer {
         }
 
         var texture = this.createCanvasTexture();
-        var uri = material.texture_file_name;
-        this.loadCanvasTexture(texture, uri);
-        this.textures[uri] = texture;
+        this.loadCanvasTexture(texture, material.texture_file_name);
+        this.textures[material.texture_file_name] = texture;
       });
 
       this.pmd = pmd;
@@ -417,16 +453,32 @@ class MMD_Renderer extends WebGLRenderer {
       gl.vertexAttribPointer(this.attributes["position"], 3, GL.FLOAT, false, 0, 0);
     }
 
+    if (this.attributes.containsKey("coord")) {
+      gl.bindBuffer(GL.ARRAY_BUFFER, this.coord_buffer.buffer);
+      gl.vertexAttribPointer(this.attributes["coord"], 2, GL.FLOAT, false, 0, 0);
+    }
+
     gl.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
 
     for (int i = 0; i < this.pmd.materials.length; i++) {
       var index_buffer = this.index_buffer_list[i];
 
+      var material = this.pmd.materials[i];
+
       if (this.uniforms.containsKey("diffuse")) {
         var color = new Vector4.zero();
-        color.rgb = this.pmd.materials[i].diffuse;
-        color.a = this.pmd.materials[i].alpha;
+        color.rgb = material.diffuse;
+        color.a = material.alpha;
         gl.uniform4fv(this.uniforms["diffuse"], color.storage);
+      }
+
+      if (this.uniforms.containsKey("texture")) {
+        if(this.textures.containsKey(material.texture_file_name)) {
+          gl.bindTexture(GL.TEXTURE_2D, this.textures[material.texture_file_name].texture);
+        } else {
+          gl.bindTexture(GL.TEXTURE_2D, this.white_texture.texture);
+        }
+        gl.uniform1i(this.uniforms["texture"], 0);
       }
 
       gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, index_buffer.buffer);
