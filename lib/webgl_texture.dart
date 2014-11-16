@@ -5,23 +5,8 @@ class WebGLCanvasTexture {
   CanvasRenderingContext2D ctx;
 
   GL.Texture texture;
-  WebGLCanvasTexture(GL.RenderingContext gl, {int width : 256, int height : 256}) {
-    this.canvas = document.createElement("canvas");
-    this.canvas.width = width;
-    this.canvas.height = height;
 
-    this.ctx = this.canvas.getContext("2d");
-
-    this.texture = gl.createTexture();
-    gl.bindTexture(GL.TEXTURE_2D, this.texture);
-    gl.pixelStorei(GL.UNPACK_FLIP_Y_WEBGL, 1);
-    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE);
-    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE);
-    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.LINEAR);
-    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.LINEAR);
-    gl.texImage2DCanvas(GL.TEXTURE_2D, 0, GL.RGBA, GL.RGBA, GL.UNSIGNED_BYTE, this.canvas);
-    gl.bindTexture(GL.TEXTURE_2D, null);
-  }
+  WebGLCanvasTexture([this.texture, this.canvas, this.ctx]);
 
   Future<WebGLCanvasTexture> load(GL.RenderingContext gl, String uri) {
     var completer = new Completer<WebGLCanvasTexture>();
