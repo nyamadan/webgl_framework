@@ -1,4 +1,5 @@
 part of webgl_framework;
+
 abstract class WebGLRenderer
 {
   CanvasElement dom;
@@ -110,10 +111,7 @@ abstract class WebGLRenderer
   }
 
   WebGLElementArrayBuffer createElementArrayBuffer(Uint16List data) {
-    return new WebGLElementArrayBuffer()
-      .. buffer = this.createIBO(data)
-      ..data = data
-    ;
+    return new WebGLElementArrayBuffer(this.createIBO(data), data);
   }
 
   GL.Buffer createVBO(Float32List data) {
@@ -126,10 +124,15 @@ abstract class WebGLRenderer
   }
 
   WebGLArrayBuffer createArrayBuffer(Float32List data) {
-    return new WebGLArrayBuffer()
-      ..buffer = this.createVBO(data)
-      ..data = data
-    ;
+    return new WebGLArrayBuffer(this.createVBO(data), data);
+  }
+
+  WebGLCanvasTexture createCanvasTexture() {
+    return new WebGLCanvasTexture(gl);
+  }
+
+  Future<WebGLCanvasTexture> loadCanvasTexture(WebGLCanvasTexture texture, String uri) {
+    return texture.load(gl, uri);
   }
 
   Map<String, GL.UniformLocation> getUniformLocations(GL.Program program, List<String> uniform_names) {
@@ -161,5 +164,5 @@ abstract class WebGLRenderer
     this._initTrackball();
   }
 
-  void render(double delta);
+  void render(double ms);
 }
