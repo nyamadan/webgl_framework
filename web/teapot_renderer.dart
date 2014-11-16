@@ -36,7 +36,7 @@ class TeapotRenderer extends WebGLRenderer {
   void main(void){
     vec4 color = texture2D(texture, v_coord);
     float d  = clamp(dot(v_normal, vec3(0.0, 0.0, 1.0)), 0.0, 1.0);
-    gl_FragColor = vec4(color.rgb * (d * d + 0.5), 1.0);
+    gl_FragColor = vec4(color.rgb * ((d * d) * 0.5 + 0.5), 1.0);
   }
   """;
 
