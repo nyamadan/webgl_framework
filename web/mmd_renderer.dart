@@ -10,7 +10,6 @@ import "package:webgl_framework/webgl_framework.dart";
 import "package:vector_math/vector_math.dart";
 
 import "sjis_to_string.dart";
-import "teapot.dart" as teapot;
 
 class MMD_Vertex {
   Vector3 position;
@@ -24,12 +23,25 @@ class MMD_Vertex {
   int edge_flag;
 }
 
+class MMD_Material {
+  Vector3 diffuse;
+  double alpha;
+  double shiness;
+  Vector3 specular;
+  Vector3 ambient;
+  int toon_index;
+  int edge_flag;
+  int face_vert_count;
+  String texture_file_name;
+}
+
 class MMD_Model {
   String name;
   String comment;
 
   List<MMD_Vertex> vertices;
   Uint16List triangles;
+  List<MMD_Material> materials;
 
   Future<MMD_Model> load(String uri) {
     var completer = new Completer<MMD_Model>();
@@ -55,6 +67,25 @@ class MMD_Model {
     offset = this._getName(buffer, view, offset);
     offset = this._getVertices(buffer, view, offset);
     offset = this._getTriangles(buffer, view, offset);
+    offset = this._getMaterials(buffer, view, offset);
+  }
+
+  Uint16List createTriangleList([int index = null]) {
+    if(index == null) {
+      return new Uint16List.fromList(this.triangles);
+    }
+
+    int offset = 0;
+    int i = 0;
+    for(i = 0; i < index; i++) {
+      offset += this.materials[i].face_vert_count;
+    }
+
+    var triangles = this.triangles
+      .getRange(offset, offset + this.materials[i].face_vert_count)
+      .toList()
+    ;
+    return new Uint16List.fromList(triangles);
   }
 
   Float32List createPositionList() {
@@ -93,15 +124,23 @@ class MMD_Model {
       throw(new Exception("File is not PMD"));
     }
 
-    return offset + 7 * Uint8List.BYTES_PER_ELEMENT;
+    return offset + 7;
   }
 
   int _getName(ByteBuffer buffer, ByteData view, int offset) {
-    this.name = sjisArrayToString(buffer.asUint8List(offset, 20));
-    offset += Uint8List.BYTES_PER_ELEMENT * 20;
+    var name = new Uint8List(20);
+    for(int i = 0; i < name.length; i++) {
+      name[i] = view.getUint8(offset);
+      offset += 1;
+    }
+    this.name = sjisArrayToString(name);
 
-    this.comment = sjisArrayToString(buffer.asUint8List(offset, 256));
-    offset += Uint8List.BYTES_PER_ELEMENT * 256;
+    var comment = new Uint8List(256);
+    for(int i = 0; i < comment.length; i++) {
+      comment[i] = view.getUint8(offset);
+      offset += 1;
+    }
+    this.comment = sjisArrayToString(comment);
 
     return offset;
   }
@@ -116,37 +155,37 @@ class MMD_Model {
 
       v.position = new Vector3.zero();
       v.position.x = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
-      offset += Float32List.BYTES_PER_ELEMENT;
+      offset += 4;
       v.position.y = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
-      offset += Float32List.BYTES_PER_ELEMENT;
+      offset += 4;
       v.position.z = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
-      offset += Float32List.BYTES_PER_ELEMENT;
+      offset += 4;
 
       v.normal = new Vector3.zero();
       v.normal.x = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
-      offset += Float32List.BYTES_PER_ELEMENT;
+      offset += 4;
       v.normal.y = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
-      offset += Float32List.BYTES_PER_ELEMENT;
+      offset += 4;
       v.normal.z = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
-      offset += Float32List.BYTES_PER_ELEMENT;
+      offset += 4;
 
       v.coord = new Vector2.zero();
       v.coord.x = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
-      offset += Float32List.BYTES_PER_ELEMENT;
+      offset += 4;
       v.coord.y = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
-      offset += Float32List.BYTES_PER_ELEMENT;
+      offset += 4;
 
       v.bone1 = view.getUint16(offset, Endianness.LITTLE_ENDIAN);
-      offset += Uint16List.BYTES_PER_ELEMENT;
+      offset += 2;
 
       v.bone2 = view.getUint16(offset, Endianness.LITTLE_ENDIAN);
-      offset += Uint16List.BYTES_PER_ELEMENT;
+      offset += 2;
 
       v.bone_weight = view.getUint8(offset);
-      offset += Uint8List.BYTES_PER_ELEMENT;
+      offset += 1;
 
       v.edge_flag = view.getUint8(offset);
-      offset += Uint8List.BYTES_PER_ELEMENT;
+      offset += 1;
 
       this.vertices.add(v);
     }
@@ -155,22 +194,85 @@ class MMD_Model {
 
   int _getTriangles(ByteBuffer buffer, ByteData view, int offset) {
     int length = view.getUint32(offset, Endianness.LITTLE_ENDIAN);
-    offset += Uint32List.BYTES_PER_ELEMENT;
+    offset += 4;
 
     this.triangles = new Uint16List(length);
     for(int i = 0; i < length; i += 3) {
       int v0 = view.getUint16(offset, Endianness.LITTLE_ENDIAN);
-      offset += Uint16List.BYTES_PER_ELEMENT;
+      offset += 2;
 
       int v1 = view.getUint16(offset, Endianness.LITTLE_ENDIAN);
-      offset += Uint16List.BYTES_PER_ELEMENT;
+      offset += 2;
 
       int v2 = view.getUint16(offset, Endianness.LITTLE_ENDIAN);
-      offset += Uint16List.BYTES_PER_ELEMENT;
+      offset += 2;
 
       this.triangles[i + 0] = v1;
       this.triangles[i + 1] = v0;
       this.triangles[i + 2] = v2;
+    }
+
+    return offset;
+  }
+
+  int _getMaterials(ByteBuffer buffer, ByteData view, int offset) {
+    int length = view.getUint32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+
+    this.materials = new List<MMD_Material>();
+    for(int i = 0; i < length; i += 3) {
+      var material = new MMD_Material();
+
+      var diffuse = new Vector3.zero();
+      diffuse.x = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+      offset += 4;
+      diffuse.y = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+      offset += 4;
+      diffuse.z = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+      offset += 4;
+      material.diffuse = diffuse;
+
+      material.alpha = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+      offset += 4;
+
+      material.shiness = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+      offset += 4;
+
+      var specular = new Vector3.zero();
+      specular.x = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+      offset += 4;
+      specular.y = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+      offset += 4;
+      specular.z = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+      offset += 4;
+      material.specular = specular;
+
+      var ambient = new Vector3.zero();
+      ambient.x = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+      offset += 4;
+      ambient.y = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+      offset += 4;
+      ambient.z = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+      offset += 4;
+      material.ambient = ambient;
+
+      material.toon_index = view.getInt8(offset);
+      offset += 1;
+
+      material.edge_flag = view.getUint8(offset);
+      offset += 1;
+
+      material.face_vert_count = view.getUint32(offset, Endianness.LITTLE_ENDIAN);
+      offset += 4;
+
+      var texture_file_name = new Uint8List(20);
+      for(int i = 0; i < texture_file_name.length; i++) {
+        texture_file_name[i] = view.getUint8(offset);
+        offset += 1;
+      }
+      material.texture_file_name = sjisArrayToString(texture_file_name);
+
+      this.materials.add(material);
     }
 
     return offset;
@@ -195,10 +297,12 @@ class MMD_Renderer extends WebGLRenderer {
   static const String FS =
   """
   precision mediump float;
+
+  uniform vec4 diffuse;
   varying vec3 v_normal;
 
   void main(void){
-    gl_FragColor = vec4(v_normal, 1.0);
+    gl_FragColor = diffuse;
   }
   """;
 
@@ -209,7 +313,8 @@ class MMD_Renderer extends WebGLRenderer {
 
   WebGLArrayBuffer position_buffer;
   WebGLArrayBuffer normal_buffer;
-  WebGLElementArrayBuffer index_buffer;
+  List<WebGLElementArrayBuffer> index_buffer_list;
+  Map<String, WebGLCanvasTexture> textures;
 
   MMD_Model pmd;
 
@@ -225,11 +330,18 @@ class MMD_Renderer extends WebGLRenderer {
       "position",
       "normal",
     ]);
+
     this.uniforms = this.getUniformLocations(this.program, [
+      "diffuse",
       "mvp_matrix",
     ]);
 
     gl.enable(GL.DEPTH_TEST);
+    gl.depthFunc(GL.LEQUAL);
+
+    gl.enable(GL.CULL_FACE);
+    gl.frontFace(GL.CW);
+
     gl.clearColor(0.5, 0.5, 0.5, 1.0);
     gl.useProgram(this.program);
 
@@ -241,16 +353,34 @@ class MMD_Renderer extends WebGLRenderer {
       gl.enableVertexAttribArray(this.attributes["normal"]);
     }
 
+    this._load();
+  }
+
+  void _load() {
     (new MMD_Model())
     .load("miku.pmd")
     .then((MMD_Model pmd){
       var position_list = pmd.createPositionList();
       var normal_list = pmd.createNormalList();
-      var index_list = pmd.triangles;
 
       this.position_buffer = this.createArrayBuffer(position_list);
       this.normal_buffer = this.createArrayBuffer(normal_list);
-      this.index_buffer = this.createElementArrayBuffer(index_list);
+
+      this.index_buffer_list = new List<WebGLElementArrayBuffer>.generate(pmd.materials.length,
+        (int i) => this.createElementArrayBuffer(pmd.createTriangleList(i))
+      );
+
+      this.textures = new Map<String, WebGLCanvasTexture>();
+      pmd.materials.forEach((MMD_Material material){
+        if( material.texture_file_name.isEmpty || this.textures.containsKey(material.texture_file_name)) {
+          return;
+        }
+
+        var texture = this.createCanvasTexture();
+        var uri = material.texture_file_name;
+        this.loadCanvasTexture(texture, uri);
+        this.textures[uri] = texture;
+      });
 
       this.pmd = pmd;
     });
@@ -265,7 +395,7 @@ class MMD_Renderer extends WebGLRenderer {
     setPerspectiveMatrix(projection, Math.PI * 60.0 / 180.0, this.aspect, 0.1, 1000.0);
 
     Matrix4 view = new Matrix4.identity();
-    Vector3 look_from = new Vector3(0.0, 0.0, 20.0 + 10.0 * this.trackball_value);
+    Vector3 look_from = new Vector3(0.0, 0.0, 25.0 + 25.0 * this.trackball_value);
     setViewMatrix(view, look_from, new Vector3(0.0, 0.0, 0.0), new Vector3(0.0, 1.0, 0.0));
 
     Matrix4 model = new Matrix4.identity();
@@ -289,7 +419,18 @@ class MMD_Renderer extends WebGLRenderer {
 
     gl.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
 
-    gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, this.index_buffer.buffer);
-    gl.drawElements(GL.TRIANGLES, this.index_buffer.data.length, GL.UNSIGNED_SHORT, 0);
+    for (int i = 0; i < this.pmd.materials.length; i++) {
+      var index_buffer = this.index_buffer_list[i];
+
+      if (this.uniforms.containsKey("diffuse")) {
+        var color = new Vector4.zero();
+        color.rgb = this.pmd.materials[i].diffuse;
+        color.a = this.pmd.materials[i].alpha;
+        gl.uniform4fv(this.uniforms["diffuse"], color.storage);
+      }
+
+      gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, index_buffer.buffer);
+      gl.drawElements(GL.TRIANGLES, index_buffer.data.length, GL.UNSIGNED_SHORT, 0);
+    }
   }
 }
