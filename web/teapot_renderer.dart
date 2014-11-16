@@ -97,7 +97,7 @@ class TeapotRenderer extends WebGLRenderer {
     }
 
     this.texture = this.createCanvasTexture();
-    this.loadCanvasTexture(this.texture, "pattern.png");
+    this.loadCanvasTexture(this.texture, "pattern.png", flip_y: true);
 
     gl.activeTexture(GL.TEXTURE0);
   }
