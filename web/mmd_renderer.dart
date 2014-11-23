@@ -120,15 +120,15 @@ class MMD_Renderer extends WebGLRenderer {
       var normal_list = pmd.createNormalList();
       var coord_list = pmd.createCoordList();
 
-      this.position_buffer = this.createArrayBuffer(position_list);
-      this.normal_buffer = this.createArrayBuffer(normal_list);
-      this.coord_buffer = this.createArrayBuffer(coord_list);
+      this.position_buffer = new WebGLArrayBuffer(gl, position_list);
+      this.normal_buffer = new WebGLArrayBuffer(gl, normal_list);
+      this.coord_buffer = new WebGLArrayBuffer(gl, coord_list);
 
       this.index_buffer_list = new List<WebGLElementArrayBuffer>.generate(pmd.materials.length,
-        (int i) => this.createElementArrayBuffer(pmd.createTriangleList(i))
+        (int i) => new WebGLElementArrayBuffer(gl, pmd.createTriangleList(i))
       );
 
-      this.white_texture = this.createCanvasTexture(
+      this.white_texture = new WebGLCanvasTexture(gl,
         width : 16, height : 16,
         color : new Vector4(1.0, 1.0, 1.0, 1.0)
       );
@@ -139,8 +139,8 @@ class MMD_Renderer extends WebGLRenderer {
           return;
         }
 
-        var texture = this.createCanvasTexture();
-        this.loadCanvasTexture(texture, material.texture_file_name);
+        var texture = new WebGLCanvasTexture(gl);
+        texture.load(gl, material.texture_file_name);
         this.textures[material.texture_file_name] = texture;
       });
 
@@ -157,14 +157,14 @@ class MMD_Renderer extends WebGLRenderer {
     setPerspectiveMatrix(projection, Math.PI * 60.0 / 180.0, this.aspect, 0.1, 1000.0);
 
     Matrix4 view = new Matrix4.identity();
-    Vector3 look_from = new Vector3(0.0, 0.0, 25.0 + 25.0 * this.trackball_value);
+    Vector3 look_from = new Vector3(0.0, 0.0, 25.0 + 25.0 * this.trackball.value);
     setViewMatrix(view, look_from, new Vector3(0.0, 0.0, 0.0), new Vector3(0.0, 1.0, 0.0));
 
     Matrix4 rh = new Matrix4.identity();
     rh.storage[10] = -1.0;
 
     Matrix4 rot = new Matrix4.identity();
-    rot.setRotation(this.trackball_rotation.asRotationMatrix());
+    rot.setRotation(this.trackball.rotation.asRotationMatrix());
 
     Matrix4 normal = rot * rh;
 
