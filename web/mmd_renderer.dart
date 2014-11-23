@@ -59,6 +59,16 @@ class MMD_Vertex {
 
     return offset;
   }
+
+  String toString() => ["{", [
+    "position: ${this.position}",
+    "normal: ${this.normal}",
+    "coord: ${this.coord}",
+    "bone1: ${this.bone1}",
+    "bone2: ${this.bone2}",
+    "bone_weight: ${this.bone_weight}",
+    "edge_flag: ${this.edge_flag}",
+  ].join(", "), "}"].join("");
 }
 
 class MMD_Material {
@@ -160,6 +170,14 @@ class MMD_Bone {
 
     return offset;
   }
+
+  String toString() => ["{", [
+    "name: ${this.name}",
+    "bone_type: ${this.bone_type}",
+    "bone_head_pos: ${this.bone_head_pos}",
+    "ik_parent_bone_index: ${this.ik_parent_bone_index}",
+    "parent_bone_index: ${this.parent_bone_index}",
+  ].join(", "), "}"].join("");
 }
 
 class MMD_IK {
@@ -194,6 +212,14 @@ class MMD_IK {
 
     return offset;
   }
+
+  String toString() => ["{", [
+    "bone_index: ${this.bone_index}",
+    "target_bone_index: ${this.target_bone_index}",
+    "position: ${this.iterations}",
+    "control_weight: ${this.control_weight}",
+    "child_bones: ${this.child_bones}",
+  ].join(", "), "}"].join("");
 }
 
 class MMD_MorphVertex {
@@ -215,6 +241,11 @@ class MMD_MorphVertex {
 
     return offset;
   }
+
+  String toString() => ["{", [
+    "index: ${this.index}",
+    "position: ${this.position}",
+  ].join(", "), "}"].join("");
 }
 
 class MMD_Morph {
@@ -281,6 +312,28 @@ class MMD_Model {
     offset = this._getBones(buffer, view, offset);
     offset = this._getIKs(buffer, view, offset);
     offset = this._getMorphs(buffer, view, offset);
+  }
+
+  void normalizePositions() {
+    for(int i = 0; i < this.vertices.length; i++) {
+      MMD_Vertex vertex = this.vertices[i];
+      MMD_Bone bone1 = this.bones[vertex.bone1];
+      MMD_Bone bone2 = this.bones[vertex.bone2];
+      num weight = vertex.bone_weight / 100;
+      Vector3 offset = (bone1.bone_head_pos * weight) + (bone2.bone_head_pos * (1.0 - weight));
+      vertex.position = vertex.position - offset;
+    }
+  }
+
+  void denormalizePositions() {
+    for(int i = 0; i < this.vertices.length; i++) {
+      MMD_Vertex vertex = this.vertices[i];
+      MMD_Bone bone1 = this.bones[vertex.bone1];
+      MMD_Bone bone2 = this.bones[vertex.bone2];
+      num weight = vertex.bone_weight / 100;
+      Vector3 offset = (bone1.bone_head_pos * weight) + (bone2.bone_head_pos * (1.0 - weight));
+      vertex.position = vertex.position + offset;
+    }
   }
 
   Uint16List createTriangleList([int index = null]) {
@@ -463,12 +516,13 @@ class MMD_Renderer extends WebGLRenderer {
   attribute vec3 normal;
   attribute vec2 coord;
   uniform mat4 mvp_matrix;
+  uniform mat4 normal_matrix;
 
   varying vec3 v_normal;
   varying vec2 v_coord;
 
   void main(void){
-    v_normal = normal;
+    v_normal = vec3(normal_matrix * vec4(normal, 1.0));
     v_coord = coord;
     gl_Position = mvp_matrix * vec4(position, 1.0);
   }
@@ -487,7 +541,7 @@ class MMD_Renderer extends WebGLRenderer {
   void main(void){
     vec4 tex_color = texture2D(texture, v_coord);
 
-    float d = clamp(dot(v_normal, vec3(0.0, 0.0, -1.0)), 0.0, 1.0);
+    float d = clamp(dot(v_normal, vec3(0.0, 0.0, 1.0)), 0.0, 1.0);
     d = (d * d) * 0.5 + 0.5;
     gl_FragColor = vec4(diffuse.rgb * tex_color.rgb * d, diffuse.a);
   }
@@ -525,6 +579,7 @@ class MMD_Renderer extends WebGLRenderer {
       "diffuse",
       "texture",
       "mvp_matrix",
+      "normal_matrix",
     ]);
 
     gl.enable(GL.DEPTH_TEST);
@@ -607,12 +662,18 @@ class MMD_Renderer extends WebGLRenderer {
     Matrix4 rot = new Matrix4.identity();
     rot.setRotation(this.trackball_rotation.asRotationMatrix());
 
+    Matrix4 normal = rot * rh;
+
     Matrix4 model = rot * rh;
 
     Matrix4 mvp = projection * view * model;
 
     if (this.uniforms.containsKey("mvp_matrix")) {
       gl.uniformMatrix4fv(this.uniforms["mvp_matrix"], false, mvp.storage);
+    }
+
+    if (this.uniforms.containsKey("normal_matrix")) {
+      gl.uniformMatrix4fv(this.uniforms["normal_matrix"], false, normal.storage);
     }
 
     if (this.attributes.containsKey("normal")) {
