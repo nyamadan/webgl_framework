@@ -69,10 +69,10 @@ class TeapotRenderer extends WebGLRenderer {
       "texture",
     ]);
 
-    this.position_buffer = this.createArrayBuffer(teapot.positions);
-    this.normal_buffer = this.createArrayBuffer(teapot.normals);
-    this.coord_buffer = this.createArrayBuffer(teapot.coords);
-    this.index_buffer = this.createElementArrayBuffer(teapot.indices);
+    this.position_buffer = new WebGLArrayBuffer(gl, teapot.positions);
+    this.normal_buffer = new WebGLArrayBuffer(gl, teapot.normals);
+    this.coord_buffer = new WebGLArrayBuffer(gl, teapot.coords);
+    this.index_buffer = new WebGLElementArrayBuffer(gl, teapot.indices);
 
     gl.enable(GL.DEPTH_TEST);
     gl.clearColor(0.5, 0.5, 0.5, 1.0);
@@ -96,8 +96,8 @@ class TeapotRenderer extends WebGLRenderer {
       gl.vertexAttribPointer(this.attributes["coord"], 2, GL.FLOAT, false, 0, 0);
     }
 
-    this.texture = this.createCanvasTexture();
-    this.loadCanvasTexture(this.texture, "pattern.png", flip_y: true);
+    this.texture = new WebGLCanvasTexture(gl);
+    this.texture.load(gl, "pattern.png", flip_y: true);
 
     gl.activeTexture(GL.TEXTURE0);
   }
@@ -107,11 +107,11 @@ class TeapotRenderer extends WebGLRenderer {
     setPerspectiveMatrix(projection, Math.PI * 60.0 / 180.0, this.aspect, 0.1, 1000.0);
 
     Matrix4 view = new Matrix4.identity();
-    Vector3 look_from = new Vector3(0.0, 0.0, 30.0 + 100.0 * this.trackball_value);
+    Vector3 look_from = new Vector3(0.0, 0.0, 30.0 + 100.0 * this.trackball.value);
     setViewMatrix(view, look_from, new Vector3(0.0, 0.0, 0.0), new Vector3(0.0, 1.0, 0.0));
 
     Matrix4 model = new Matrix4.identity();
-    model.setRotation(this.trackball_rotation.asRotationMatrix());
+    model.setRotation(this.trackball.rotation.asRotationMatrix());
 
     Matrix4 mvp = projection * view * model;
 
