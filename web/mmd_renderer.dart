@@ -21,6 +21,44 @@ class MMD_Vertex {
 
   int bone_weight;
   int edge_flag;
+
+  int parse(ByteBuffer buffer, ByteData view, int offset) {
+    this.position = new Vector3.zero();
+    this.position.x = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+    this.position.y = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+    this.position.z = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+
+    this.normal = new Vector3.zero();
+    this.normal.x = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+    this.normal.y = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+    this.normal.z = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+
+    this.coord = new Vector2.zero();
+    this.coord.x = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+    this.coord.y = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+
+    this.bone1 = view.getUint16(offset, Endianness.LITTLE_ENDIAN);
+    offset += 2;
+
+    this.bone2 = view.getUint16(offset, Endianness.LITTLE_ENDIAN);
+    offset += 2;
+
+    this.bone_weight = view.getUint8(offset);
+    offset += 1;
+
+    this.edge_flag = view.getUint8(offset);
+    offset += 1;
+
+    return offset;
+  }
 }
 
 class MMD_Material {
@@ -33,6 +71,175 @@ class MMD_Material {
   int edge_flag;
   int face_vert_count;
   String texture_file_name;
+
+  int parse(ByteBuffer buffer, ByteData view, int offset){
+    var diffuse = new Vector3.zero();
+    diffuse.x = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+    diffuse.y = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+    diffuse.z = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+    this.diffuse = diffuse;
+
+    this.alpha = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+
+    this.shiness = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+
+    var specular = new Vector3.zero();
+    specular.x = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+    specular.y = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+    specular.z = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+    this.specular = specular;
+
+    var ambient = new Vector3.zero();
+    ambient.x = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+    ambient.y = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+    ambient.z = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+    this.ambient = ambient;
+
+    this.toon_index = view.getInt8(offset);
+    offset += 1;
+
+    this.edge_flag = view.getUint8(offset);
+    offset += 1;
+
+    this.face_vert_count = view.getUint32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+
+    var texture_file_name = new Uint8List(20);
+    for(int i = 0; i < texture_file_name.length; i++) {
+      texture_file_name[i] = view.getUint8(offset);
+      offset += 1;
+    }
+    this.texture_file_name = sjisArrayToString(texture_file_name);
+
+    return offset;
+  }
+}
+
+class MMD_Bone {
+  String name;
+  int parent_bone_index;
+  int tail_pos_bone_index;
+  int bone_type;
+  int ik_parent_bone_index;
+  Vector3 bone_head_pos;
+
+  int parse(ByteBuffer buffer, ByteData view, int offset) {
+    this.name = sjisArrayToString(new Uint8List.view(buffer, offset, 20));
+    offset += 20;
+
+    this.parent_bone_index = view.getInt16(offset, Endianness.LITTLE_ENDIAN);
+    offset += 2;
+
+    this.tail_pos_bone_index = view.getInt16(offset, Endianness.LITTLE_ENDIAN);
+    offset += 2;
+
+    this.bone_type = view.getUint8(offset);
+    offset += 1;
+
+    this.ik_parent_bone_index = view.getUint16(offset, Endianness.LITTLE_ENDIAN);
+    offset += 2;
+
+    this.bone_head_pos = new Vector3.zero();
+    this.bone_head_pos.x = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+    this.bone_head_pos.y = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+    this.bone_head_pos.z = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+
+    return offset;
+  }
+}
+
+class MMD_IK {
+  int bone_index;
+  int target_bone_index;
+  int iterations;
+  double control_weight;
+  List<int> child_bones;
+
+  int parse(ByteBuffer buffer, ByteData view, int offset) {
+    this.bone_index = view.getInt16(offset, Endianness.LITTLE_ENDIAN);
+    offset += 2;
+
+    this.target_bone_index = view.getInt16(offset, Endianness.LITTLE_ENDIAN);
+    offset += 2;
+
+    int chain_length = view.getUint8(offset);
+    offset += 1;
+
+    this.iterations = view.getUint16(offset, Endianness.LITTLE_ENDIAN);
+    offset += 2;
+
+    this.control_weight = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+
+    this.child_bones = new List<int>.generate(chain_length, (int i){
+      int bone_index = view.getInt16(offset, Endianness.LITTLE_ENDIAN);
+      offset += 2;
+
+      return bone_index;
+    });
+
+    return offset;
+  }
+}
+
+class MMD_MorphVertex {
+  int index;
+  Vector3 position;
+
+  int parse(ByteBuffer buffer, ByteData view, int offset) {
+    this.index = view.getUint32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+
+    this.position = new Vector3.zero();
+
+    this.position.x = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+    this.position.y = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+    this.position.z = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+
+    return offset;
+  }
+}
+
+class MMD_Morph {
+  String name;
+  int morph_type;
+  List<MMD_MorphVertex> morph_vertices;
+
+  int parse(ByteBuffer buffer, ByteData view, int offset) {
+    this.name = sjisArrayToString(new Uint8List.view(buffer, offset, 20));
+    offset += 20;
+
+    int length = view.getUint32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+
+    this.morph_type = view.getUint8(offset);
+    offset += 1;
+
+    this.morph_vertices = new List<MMD_MorphVertex>.generate(length, (int i){
+      var morph_vertex = new MMD_MorphVertex();
+      offset = morph_vertex.parse(buffer, view, offset);
+      return morph_vertex;
+    });
+
+    return offset;
+  }
 }
 
 class MMD_Model {
@@ -42,6 +249,9 @@ class MMD_Model {
   List<MMD_Vertex> vertices;
   Uint16List triangles;
   List<MMD_Material> materials;
+  List<MMD_Bone> bones;
+  List<MMD_IK> iks;
+  List<MMD_Morph> morphs;
 
   Future<MMD_Model> load(String uri) {
     var completer = new Completer<MMD_Model>();
@@ -68,6 +278,9 @@ class MMD_Model {
     offset = this._getVertices(buffer, view, offset);
     offset = this._getTriangles(buffer, view, offset);
     offset = this._getMaterials(buffer, view, offset);
+    offset = this._getBones(buffer, view, offset);
+    offset = this._getIKs(buffer, view, offset);
+    offset = this._getMorphs(buffer, view, offset);
   }
 
   Uint16List createTriangleList([int index = null]) {
@@ -159,46 +372,11 @@ class MMD_Model {
     int length = view.getUint32(offset, Endianness.LITTLE_ENDIAN);
     offset += Uint32List.BYTES_PER_ELEMENT;
 
-    this.vertices = new List<MMD_Vertex>();
-    for(int i = 0; i < length; i++) {
+    this.vertices = new List<MMD_Vertex>.generate(length, (int i){
       var v = new MMD_Vertex();
-
-      v.position = new Vector3.zero();
-      v.position.x = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
-      offset += 4;
-      v.position.y = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
-      offset += 4;
-      v.position.z = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
-      offset += 4;
-
-      v.normal = new Vector3.zero();
-      v.normal.x = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
-      offset += 4;
-      v.normal.y = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
-      offset += 4;
-      v.normal.z = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
-      offset += 4;
-
-      v.coord = new Vector2.zero();
-      v.coord.x = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
-      offset += 4;
-      v.coord.y = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
-      offset += 4;
-
-      v.bone1 = view.getUint16(offset, Endianness.LITTLE_ENDIAN);
-      offset += 2;
-
-      v.bone2 = view.getUint16(offset, Endianness.LITTLE_ENDIAN);
-      offset += 2;
-
-      v.bone_weight = view.getUint8(offset);
-      offset += 1;
-
-      v.edge_flag = view.getUint8(offset);
-      offset += 1;
-
-      this.vertices.add(v);
-    }
+      offset = v.parse(buffer, view, offset);
+      return v;
+    });
     return offset;
   }
 
@@ -229,61 +407,50 @@ class MMD_Model {
     int length = view.getUint32(offset, Endianness.LITTLE_ENDIAN);
     offset += 4;
 
-    this.materials = new List<MMD_Material>();
-    for(int i = 0; i < length; i++) {
+    this.materials = new List<MMD_Material>.generate(length, (int i){
       var material = new MMD_Material();
+      offset = material.parse(buffer, view, offset);
+      return material;
+    });
 
-      var diffuse = new Vector3.zero();
-      diffuse.x = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
-      offset += 4;
-      diffuse.y = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
-      offset += 4;
-      diffuse.z = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
-      offset += 4;
-      material.diffuse = diffuse;
+    return offset;
+  }
 
-      material.alpha = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
-      offset += 4;
+  int _getBones(ByteBuffer buffer, ByteData view, int offset) {
+    int length = view.getUint16(offset, Endianness.LITTLE_ENDIAN);
+    offset += 2;
 
-      material.shiness = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
-      offset += 4;
+    this.bones = new List<MMD_Bone>.generate(length, (int i){
+      var bone = new MMD_Bone();
+      offset = bone.parse(buffer, view, offset);
+      return bone;
+    });
 
-      var specular = new Vector3.zero();
-      specular.x = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
-      offset += 4;
-      specular.y = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
-      offset += 4;
-      specular.z = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
-      offset += 4;
-      material.specular = specular;
+    return offset;
+  }
 
-      var ambient = new Vector3.zero();
-      ambient.x = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
-      offset += 4;
-      ambient.y = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
-      offset += 4;
-      ambient.z = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
-      offset += 4;
-      material.ambient = ambient;
+  int _getIKs(ByteBuffer buffer, ByteData view, int offset) {
+    int length = view.getUint16(offset, Endianness.LITTLE_ENDIAN);
+    offset += 2;
 
-      material.toon_index = view.getInt8(offset);
-      offset += 1;
+    this.iks = new List<MMD_IK>.generate(length, (int i){
+      var ik = new MMD_IK();
+      offset = ik.parse(buffer, view, offset);
+      return ik;
+    });
 
-      material.edge_flag = view.getUint8(offset);
-      offset += 1;
+    return offset;
+  }
 
-      material.face_vert_count = view.getUint32(offset, Endianness.LITTLE_ENDIAN);
-      offset += 4;
+  int _getMorphs(ByteBuffer buffer, ByteData view, int offset) {
+    int length = view.getUint16(offset, Endianness.LITTLE_ENDIAN);
+    offset += 2;
 
-      var texture_file_name = new Uint8List(20);
-      for(int i = 0; i < texture_file_name.length; i++) {
-        texture_file_name[i] = view.getUint8(offset);
-        offset += 1;
-      }
-      material.texture_file_name = sjisArrayToString(texture_file_name);
-
-      this.materials.add(material);
-    }
+    this.morphs = new List<MMD_Morph>.generate(length, (int i){
+      var morph = new MMD_Morph();
+      offset = morph.parse(buffer, view, offset);
+      return morph;
+    });
 
     return offset;
   }
