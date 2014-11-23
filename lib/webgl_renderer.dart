@@ -91,6 +91,8 @@ abstract class WebGLRenderer
     });
 
     this.dom.onMouseWheel.listen((WheelEvent event){
+      event.preventDefault();
+
       if(event.deltaY > 0.0) {
         this.trackball_value = Math.min(this.trackball_value + this.trackball_value_delta, 1.0);
       }
