@@ -18,17 +18,53 @@ class MMD_Renderer extends WebGLRenderer {
   """
   attribute vec3 position;
   attribute vec3 normal;
+  attribute vec3 bone;
   attribute vec2 coord;
-  uniform mat4 mvp_matrix;
-  uniform mat4 normal_matrix;
+  uniform mat4 model_matrix;
+  uniform mat4 view_matrix;
+  uniform mat4 projection_matrix;
+
+  uniform sampler2D bone_texture;
 
   varying vec4 v_normal;
   varying vec2 v_coord;
 
+  const vec2 half_bone = vec2(0.5 / 4.0, 0.5 / 512.0);
+
+  mat4 getBoneMatrix(float bone_index) {
+    return mat4(
+      texture2D(bone_texture, vec2(
+          0.0 * half_bone.x + half_bone.x,
+          2.0 * bone_index * half_bone.y + half_bone.y
+      )),
+      texture2D(bone_texture, vec2(
+          2.0 * half_bone.x + half_bone.x,
+          2.0 * bone_index * half_bone.y + half_bone.y
+      )),
+      texture2D(bone_texture, vec2(
+          4.0 * half_bone.x + half_bone.x,
+          2.0 * bone_index * half_bone.y + half_bone.y
+      )),
+      texture2D(bone_texture, vec2(
+          8.0 * half_bone.x + half_bone.x,
+          2.0 * bone_index * half_bone.y + half_bone.y
+      ))
+    );
+  }
+
   void main(void){
-    v_normal = normal_matrix * vec4(normal, 1.0);
+    mat4 bone1 = getBoneMatrix(bone.x);
+    mat4 bone2 = getBoneMatrix(bone.y);
+
+    vec4 p1 = bone1 * vec4(position, 1.0);
+    vec4 p2 = bone2 * vec4(position, 1.0);
+
+    vec4 p = p1 * bone.z + p2 * (1.0 - bone.z);
+
+    v_normal = vec4(normalize(mat3(model_matrix) * normal), 1.0);
+
     v_coord = coord;
-    gl_Position = mvp_matrix * vec4(position, 1.0);
+    gl_Position = projection_matrix * view_matrix * model_matrix * p;
   }
   """;
 
@@ -59,14 +95,20 @@ class MMD_Renderer extends WebGLRenderer {
   WebGLArrayBuffer position_buffer;
   WebGLArrayBuffer normal_buffer;
   WebGLArrayBuffer coord_buffer;
+  WebGLArrayBuffer bone_buffer;
+
   List<WebGLElementArrayBuffer> index_buffer_list;
   Map<String, WebGLCanvasTexture> textures;
   WebGLCanvasTexture white_texture;
+  WebGLTypedDataTexture bone_texture;
 
   PMD_Model pmd;
 
   MMD_Renderer({int width: 512, int height: 512}) : super(width: width, height: height)
   {
+    gl.getExtension("OES_texture_float");
+    gl.getExtension("OES_texture_float_linear");
+
     var vs = this.compileVertexShader(VS);
     var fs = this.compileFragmentShader(FS);
     this.program = this.linkProgram(vs, fs);
@@ -77,13 +119,17 @@ class MMD_Renderer extends WebGLRenderer {
       "position",
       "normal",
       "coord",
+      "bone",
     ]);
 
     this.uniforms = this.getUniformLocations(this.program, [
       "diffuse",
       "texture",
+      "bone_texture",
       "mvp_matrix",
-      "normal_matrix",
+      "model_matrix",
+      "view_matrix",
+      "projection_matrix",
     ]);
 
     gl.enable(GL.DEPTH_TEST);
@@ -107,7 +153,9 @@ class MMD_Renderer extends WebGLRenderer {
       gl.enableVertexAttribArray(this.attributes["coord"]);
     }
 
-    gl.activeTexture(GL.TEXTURE0);
+    if (this.attributes.containsKey("bone")) {
+      gl.enableVertexAttribArray(this.attributes["bone"]);
+    }
 
     this._load();
   }
@@ -121,10 +169,12 @@ class MMD_Renderer extends WebGLRenderer {
       var position_list = pmd.createPositionList();
       var normal_list = pmd.createNormalList();
       var coord_list = pmd.createCoordList();
+      var bone_buffer = pmd.createBoneList();
 
       this.position_buffer = new WebGLArrayBuffer(gl, position_list);
       this.normal_buffer = new WebGLArrayBuffer(gl, normal_list);
       this.coord_buffer = new WebGLArrayBuffer(gl, coord_list);
+      this.bone_buffer = new WebGLArrayBuffer(gl, bone_buffer);
 
       this.index_buffer_list = new List<WebGLElementArrayBuffer>.generate(pmd.materials.length,
         (int i) => new WebGLElementArrayBuffer(gl, pmd.createTriangleList(i))
@@ -134,6 +184,17 @@ class MMD_Renderer extends WebGLRenderer {
         width : 16, height : 16,
         color : new Vector4(1.0, 1.0, 1.0, 1.0)
       );
+
+      Float32List bone_data = new Float32List(4 * 512 * 4);
+      for(int i = 0; i < pmd.bones.length; i++) {
+        PMD_Bone bone = pmd.bones[i];
+        int offset = i * 16;
+
+        Matrix4 m = new Matrix4.identity();
+        m.translate(bone.bone_head_pos);
+        bone_data.setRange(offset, offset + 16, m.storage);
+      }
+      this.bone_texture = new WebGLTypedDataTexture(gl, bone_data, width : 4, height : 512, type : GL.FLOAT);
 
       this.textures = new Map<String, WebGLCanvasTexture>();
       pmd.materials.forEach((PMD_Material material){
@@ -168,8 +229,6 @@ class MMD_Renderer extends WebGLRenderer {
     Matrix4 rot = new Matrix4.identity();
     rot.setRotation(this.trackball.rotation.asRotationMatrix());
 
-    Matrix4 normal = rot * rh;
-
     Matrix4 model = rot * rh;
 
     Matrix4 mvp = projection * view * model;
@@ -178,8 +237,16 @@ class MMD_Renderer extends WebGLRenderer {
       gl.uniformMatrix4fv(this.uniforms["mvp_matrix"], false, mvp.storage);
     }
 
-    if (this.uniforms.containsKey("normal_matrix")) {
-      gl.uniformMatrix4fv(this.uniforms["normal_matrix"], false, normal.storage);
+    if (this.uniforms.containsKey("model_matrix")) {
+      gl.uniformMatrix4fv(this.uniforms["model_matrix"], false, model.storage);
+    }
+
+    if (this.uniforms.containsKey("view_matrix")) {
+      gl.uniformMatrix4fv(this.uniforms["view_matrix"], false, view.storage);
+    }
+
+    if (this.uniforms.containsKey("projection_matrix")) {
+      gl.uniformMatrix4fv(this.uniforms["projection_matrix"], false, projection.storage);
     }
 
     if (this.attributes.containsKey("normal")) {
@@ -197,6 +264,11 @@ class MMD_Renderer extends WebGLRenderer {
       gl.vertexAttribPointer(this.attributes["coord"], 2, GL.FLOAT, false, 0, 0);
     }
 
+    if (this.attributes.containsKey("bone")) {
+      gl.bindBuffer(GL.ARRAY_BUFFER, this.bone_buffer.buffer);
+      gl.vertexAttribPointer(this.attributes["bone"], 3, GL.FLOAT, false, 0, 0);
+    }
+
     gl.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
 
     for (int i = 0; i < this.pmd.materials.length; i++) {
@@ -212,6 +284,7 @@ class MMD_Renderer extends WebGLRenderer {
       }
 
       if (this.uniforms.containsKey("texture")) {
+        gl.activeTexture(GL.TEXTURE0);
         GL.Texture texture;
         if(this.textures.containsKey(material.texture_file_name)) {
           texture = this.textures[material.texture_file_name].texture;
@@ -220,6 +293,12 @@ class MMD_Renderer extends WebGLRenderer {
         }
         gl.bindTexture(GL.TEXTURE_2D, texture);
         gl.uniform1i(this.uniforms["texture"], 0);
+      }
+
+      if (this.uniforms.containsKey("bone_texture")) {
+        gl.activeTexture(GL.TEXTURE1);
+        gl.bindTexture(GL.TEXTURE_2D, this.bone_texture.texture);
+        gl.uniform1i(this.uniforms["bone_texture"], 1);
       }
 
       gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, index_buffer.buffer);

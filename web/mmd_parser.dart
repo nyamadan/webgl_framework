@@ -371,6 +371,17 @@ class PMD_Model {
     return normal_list;
   }
 
+  Float32List createBoneList() {
+    Float32List bone_list = new Float32List(this.vertices.length * 3);
+    for(int i = 0; i < this.vertices.length; i++) {
+      PMD_Vertex vertex = this.vertices[i];
+      bone_list[i * 3 + 0] = vertex.bone1 * 1.0;
+      bone_list[i * 3 + 1] = vertex.bone2 * 1.0;
+      bone_list[i * 3 + 2] = vertex.bone_weight / 100.0;
+    }
+    return bone_list;
+  }
+
   Float32List createCoordList() {
     Float32List normal_list = new Float32List(this.vertices.length * 2);
     for(int i = 0; i < this.vertices.length; i++) {
