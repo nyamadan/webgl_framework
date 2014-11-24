@@ -1,16 +1,86 @@
 part of webgl_framework;
 
+class WebGLTypedDataTexture {
+  GL.Texture texture;
+  TypedData data;
+
+  bool flip_y;
+  int internal_format;
+  int format;
+  int type;
+  int width;
+  int height;
+
+  WebGLTypedDataTexture(GL.RenderingContext gl, TypedData data, {
+    int width : 256,
+    int height : 256,
+    bool flip_y: false,
+    int internal_format : GL.RGBA,
+    int format : GL.RGBA,
+    int type : GL.UNSIGNED_BYTE,
+    Vector4 color
+  }){
+    this.flip_y = flip_y;
+    this.format = format;
+    this.internal_format = internal_format;
+    this.type = type;
+    this.width = width;
+    this.height = height;
+
+    this.texture = gl.createTexture();
+    this.data = data;
+    gl.bindTexture(GL.TEXTURE_2D, this.texture);
+    if(this.flip_y) {
+      gl.pixelStorei(GL.UNPACK_FLIP_Y_WEBGL, 1);
+    } else {
+      gl.pixelStorei(GL.UNPACK_FLIP_Y_WEBGL, 0);
+    }
+    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE);
+    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE);
+    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.LINEAR);
+    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.LINEAR);
+    gl.texImage2DTyped(GL.TEXTURE_2D, 0, this.internal_format, this.width, this.height, 0, this.format, this.type, this.data);
+    gl.bindTexture(GL.TEXTURE_2D, null);
+  }
+
+  void refresh(GL.RenderingContext gl) {
+    gl.bindTexture(GL.TEXTURE_2D, this.texture);
+
+    if(this.flip_y) {
+      gl.pixelStorei(GL.UNPACK_FLIP_Y_WEBGL, 1);
+    } else {
+      gl.pixelStorei(GL.UNPACK_FLIP_Y_WEBGL, 0);
+    }
+    gl.texImage2DTyped(GL.TEXTURE_2D, 0, this.internal_format, this.width, this.height, 0, this.format, this.type, this.data);
+    gl.generateMipmap(GL.TEXTURE_2D);
+    gl.bindTexture(GL.TEXTURE_2D, null);
+  }
+}
+
 class WebGLCanvasTexture {
   CanvasElement canvas;
   CanvasRenderingContext2D ctx;
 
   GL.Texture texture;
+  bool flip_y;
+  int internal_format;
+  int format;
+  int type;
 
   WebGLCanvasTexture(GL.RenderingContext gl, {
     int width : 256,
     int height : 256,
+    bool flip_y : false,
+    int internal_format : GL.RGBA,
+    int format : GL.RGBA,
+    int type : GL.UNSIGNED_BYTE,
     Vector4 color
   }){
+    this.flip_y = flip_y;
+    this.format = format;
+    this.internal_format = internal_format;
+    this.type = type;
+
     this.canvas = document.createElement("canvas");
     this.canvas.width = width;
     this.canvas.height = height;
@@ -30,15 +100,33 @@ class WebGLCanvasTexture {
 
     this.texture = gl.createTexture();
     gl.bindTexture(GL.TEXTURE_2D, this.texture);
+    if(flip_y) {
+      gl.pixelStorei(GL.UNPACK_FLIP_Y_WEBGL, 1);
+    } else {
+      gl.pixelStorei(GL.UNPACK_FLIP_Y_WEBGL, 0);
+    }
     gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE);
     gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE);
     gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.LINEAR);
     gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.LINEAR);
-    gl.texImage2DCanvas(GL.TEXTURE_2D, 0, GL.RGBA, GL.RGBA, GL.UNSIGNED_BYTE, this.canvas);
+    gl.texImage2DCanvas(GL.TEXTURE_2D, 0, this.internal_format, this.format, this.type, this.canvas);
     gl.bindTexture(GL.TEXTURE_2D, null);
   }
 
-  Future<WebGLCanvasTexture> load(GL.RenderingContext gl, String uri, {bool flip_y: false}) {
+  void refresh(GL.RenderingContext gl) {
+    gl.bindTexture(GL.TEXTURE_2D, this.texture);
+
+    if(this.flip_y) {
+      gl.pixelStorei(GL.UNPACK_FLIP_Y_WEBGL, 1);
+    } else {
+      gl.pixelStorei(GL.UNPACK_FLIP_Y_WEBGL, 0);
+    }
+    gl.texImage2DCanvas(GL.TEXTURE_2D, 0, this.internal_format, this.format, this.type, this.canvas);
+    gl.generateMipmap(GL.TEXTURE_2D);
+    gl.bindTexture(GL.TEXTURE_2D, null);
+  }
+
+  Future<WebGLCanvasTexture> load(GL.RenderingContext gl, String uri) {
     var completer = new Completer<WebGLCanvasTexture>();
     var future = completer.future;
 
@@ -62,18 +150,7 @@ class WebGLCanvasTexture {
       }
 
       this.ctx.drawImage(image, 0, 0);
-
-      gl.bindTexture(GL.TEXTURE_2D, this.texture);
-
-      if(flip_y) {
-        gl.pixelStorei(GL.UNPACK_FLIP_Y_WEBGL, 1);
-      } else {
-        gl.pixelStorei(GL.UNPACK_FLIP_Y_WEBGL, 0);
-      }
-      gl.texImage2DCanvas(GL.TEXTURE_2D, 0, GL.RGBA, GL.RGBA, GL.UNSIGNED_BYTE, this.canvas);
-      gl.generateMipmap(GL.TEXTURE_2D);
-      gl.bindTexture(GL.TEXTURE_2D, null);
-
+      this.refresh(gl);
       completer.complete(this);
     });
 

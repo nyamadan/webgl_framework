@@ -96,8 +96,8 @@ class TeapotRenderer extends WebGLRenderer {
       gl.vertexAttribPointer(this.attributes["coord"], 2, GL.FLOAT, false, 0, 0);
     }
 
-    this.texture = new WebGLCanvasTexture(gl);
-    this.texture.load(gl, "pattern.png", flip_y: true);
+    this.texture = new WebGLCanvasTexture(gl, flip_y: true);
+    this.texture.load(gl, "pattern.png");
 
     gl.activeTexture(GL.TEXTURE0);
   }
