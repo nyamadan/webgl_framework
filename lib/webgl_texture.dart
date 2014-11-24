@@ -38,10 +38,6 @@ class WebGLCanvasTexture {
     gl.bindTexture(GL.TEXTURE_2D, null);
   }
 
-  void bind(GL.RenderingContext gl) {
-    gl.bindTexture(GL.TEXTURE_2D, this.texture);
-  }
-
   Future<WebGLCanvasTexture> load(GL.RenderingContext gl, String uri, {bool flip_y: false}) {
     var completer = new Completer<WebGLCanvasTexture>();
     var future = completer.future;
@@ -78,7 +74,7 @@ class WebGLCanvasTexture {
       gl.generateMipmap(GL.TEXTURE_2D);
       gl.bindTexture(GL.TEXTURE_2D, null);
 
-      completer.complete(texture);
+      completer.complete(this);
     });
 
     image.src = uri;
