@@ -22,11 +22,11 @@ class MMD_Renderer extends WebGLRenderer {
   uniform mat4 mvp_matrix;
   uniform mat4 normal_matrix;
 
-  varying vec3 v_normal;
+  varying vec4 v_normal;
   varying vec2 v_coord;
 
   void main(void){
-    v_normal = vec3(normal_matrix * vec4(normal, 1.0));
+    v_normal = normal_matrix * vec4(normal, 1.0);
     v_coord = coord;
     gl_Position = mvp_matrix * vec4(position, 1.0);
   }
@@ -39,13 +39,13 @@ class MMD_Renderer extends WebGLRenderer {
   uniform vec4 diffuse;
   uniform sampler2D texture;
 
-  varying vec3 v_normal;
+  varying vec4 v_normal;
   varying vec2 v_coord;
 
   void main(void){
     vec4 tex_color = texture2D(texture, v_coord);
 
-    float d = clamp(dot(v_normal, vec3(0.0, 0.0, 1.0)), 0.0, 1.0);
+    float d = clamp(dot(v_normal.xyz, vec3(0.0, 0.0, 1.0)), 0.0, 1.0);
     d = (d * d) * 0.5 + 0.5;
     gl_FragColor = vec4(diffuse.rgb * tex_color.rgb * d, diffuse.a);
   }
@@ -116,6 +116,8 @@ class MMD_Renderer extends WebGLRenderer {
     (new PMD_Model())
     .load("miku.pmd")
     .then((PMD_Model pmd){
+      pmd.normalizePositions();
+
       var position_list = pmd.createPositionList();
       var normal_list = pmd.createNormalList();
       var coord_list = pmd.createCoordList();
@@ -210,11 +212,13 @@ class MMD_Renderer extends WebGLRenderer {
       }
 
       if (this.uniforms.containsKey("texture")) {
+        GL.Texture texture;
         if(this.textures.containsKey(material.texture_file_name)) {
-          gl.bindTexture(GL.TEXTURE_2D, this.textures[material.texture_file_name].texture);
+          texture = this.textures[material.texture_file_name].texture;
         } else {
-          gl.bindTexture(GL.TEXTURE_2D, this.white_texture.texture);
+          texture = this.white_texture.texture;
         }
+        gl.bindTexture(GL.TEXTURE_2D, texture);
         gl.uniform1i(this.uniforms["texture"], 0);
       }
 
