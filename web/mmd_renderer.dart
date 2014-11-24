@@ -15,6 +15,7 @@ part 'pmd_parser.dart';
 part 'vmd_parser.dart';
 
 class BoneNode {
+  String name;
   Vector3 bone_position = new Vector3.zero();
 
   Vector3 position = new Vector3.zero();
@@ -47,6 +48,7 @@ class BoneNode {
   }
 
   String toString() => ["{",[
+    "name : ${this.name}",
     "bone_position : ${this.bone_position}",
     "position : ${this.position}",
     "scale : ${this.scale}",
@@ -146,6 +148,7 @@ class MMD_Renderer extends WebGLRenderer {
   VMD_Animation vmd;
 
   List<BoneNode> bones;
+  int frame = 0;
 
   MMD_Renderer({int width: 512, int height: 512}) : super(width: width, height: height)
   {
@@ -208,7 +211,7 @@ class MMD_Renderer extends WebGLRenderer {
     (new VMD_Animation())
     .load("miku.vmd")
     .then((VMD_Animation vmd) {
-      print(vmd);
+      this.vmd = vmd;
     });
   }
 
@@ -249,17 +252,18 @@ class MMD_Renderer extends WebGLRenderer {
       });
 
       Float32List bone_data = new Float32List(4 * 256 * 4);
-      this._createBones(pmd.bones);
+      this._createBoneNodes(pmd.bones);
       this.bone_texture = new WebGLTypedDataTexture(gl, bone_data, width : 4, height : 256, type : GL.FLOAT);
       this.pmd = pmd;
     });
   }
 
-  void _createBones(List<PMD_Bone> pmd_bones) {
-    this.bones = new List<BoneNode>.generate(pmd_bones.length, (int i) => new BoneNode() );
-    for(int i = 0; i < pmd_bones.length; i++) {
+  void _createBoneNodes(List<PMD_Bone> pmd_bones) {
+    this.bones = new List<BoneNode>.generate(pmd_bones.length, (int i){
+      BoneNode bone = new BoneNode();
       PMD_Bone pmd_bone = pmd_bones[i];
-      BoneNode bone = bones[i];
+
+      bone.name = pmd_bone.name;
 
       if(pmd_bone.parent_bone_index >= 0) {
         PMD_Bone parent_pmd_bone = pmd_bones[pmd_bone.parent_bone_index];
@@ -267,6 +271,12 @@ class MMD_Renderer extends WebGLRenderer {
       } else {
         bone.bone_position = new Vector3.copy(pmd_bone.bone_head_pos);
       }
+      return bone;
+    });
+
+    for(int i = 0; i < pmd_bones.length; i++) {
+      PMD_Bone pmd_bone = pmd_bones[i];
+      BoneNode bone = bones[i];
 
       for(int j = 0; j < pmd_bones.length; j++) {
         if(pmd_bones[j].parent_bone_index == i) {
@@ -276,7 +286,70 @@ class MMD_Renderer extends WebGLRenderer {
     }
   }
 
-  void _calcBone(List<BoneNode> bones, Float32List bone_data) {
+  // http://www.euclideanspace.com/maths/algebra/realNormedAlgebra/quaternions/slerp/
+  Quaternion slerpQuaternion(Quaternion qa, Quaternion qb, double t) {
+    // quaternion to return
+    Quaternion qm = new Quaternion.identity();
+
+    // Calculate angle between them.
+    double cos_half_theta = qa.w * qb.w + qa.x * qb.x + qa.y * qb.y + qa.z * qb.z;
+
+    // if qa=qb or qa=-qb then theta = 0 and we can return qa
+    if (cos_half_theta.abs() >= 1.0){
+      qm.w = qa.w;
+      qm.x = qa.x;
+      qm.y = qa.y;
+      qm.z = qa.z;
+      return qm;
+    }
+
+    // Calculate temporary values.
+    double half_theta = Math.acos(cos_half_theta);
+    double sin_half_theta = Math.sqrt(1.0 - cos_half_theta*cos_half_theta);
+
+    // if theta = 180 degrees then result is not fully defined
+    // we could rotate around any axis normal to qa or qb
+    if (sin_half_theta.abs() < 0.001){ // fabs is floating point absolute
+      qm.w = (qa.w * 0.5 + qb.w * 0.5);
+      qm.x = (qa.x * 0.5 + qb.x * 0.5);
+      qm.y = (qa.y * 0.5 + qb.y * 0.5);
+      qm.z = (qa.z * 0.5 + qb.z * 0.5);
+      return qm;
+    }
+    double ratio_a = Math.sin((1 - t) * half_theta) / sin_half_theta;
+    double ratio_b = Math.sin(t * half_theta) / sin_half_theta;
+
+    //calculate Quaternion.
+    qm.w = (qa.w * ratio_a + qb.w * ratio_b);
+    qm.x = (qa.x * ratio_a + qb.x * ratio_b);
+    qm.y = (qa.y * ratio_a + qb.y * ratio_b);
+    qm.z = (qa.z * ratio_a + qb.z * ratio_b);
+
+    return qm;
+  }
+
+  void _calcBoneAnimation(List<BoneNode> bones, VMD_Animation vmd, int frame, Float32List bone_data) {
+    for(int i = 0; i < bones.length; i++) {
+      BoneNode bone = bones[i];
+
+      List<VMD_BoneMotion> motions = vmd.getFrame(bone.name, frame);
+      if(motions != null) {
+        VMD_BoneMotion prev_frame = motions[0];
+        VMD_BoneMotion next_frame = motions[1];
+
+        if(prev_frame == null && next_frame != null) {
+          next_frame.rotation.copyTo(bone.rotation);
+        } else if(prev_frame != null && next_frame == null) {
+          prev_frame.rotation.copyTo(bone.rotation);
+        } else {
+          double blend = (frame - prev_frame.frame) / (next_frame.frame - prev_frame.frame);
+
+          this.slerpQuaternion(prev_frame.rotation, next_frame.rotation, blend).copyTo(bone.rotation);
+        }
+
+      }
+    }
+
     bones.first.update();
 
     for(int i = 0; i < bones.length; i++) {
@@ -291,7 +364,7 @@ class MMD_Renderer extends WebGLRenderer {
   }
 
   void render(double ms) {
-    if (this.pmd == null) {
+    if (this.pmd == null || this.vmd == null) {
       return;
     }
 
@@ -348,7 +421,7 @@ class MMD_Renderer extends WebGLRenderer {
       gl.vertexAttribPointer(this.attributes["bone"], 3, GL.FLOAT, false, 0, 0);
     }
 
-    this._calcBone(this.bones, this.bone_texture.data);
+    this._calcBoneAnimation(this.bones, this.vmd, this.frame, this.bone_texture.data);
     this._refreshBoneTexture();
 
     gl.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
@@ -386,5 +459,7 @@ class MMD_Renderer extends WebGLRenderer {
       gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, index_buffer.buffer);
       gl.drawElements(GL.TRIANGLES, index_buffer.data.length, GL.UNSIGNED_SHORT, 0);
     }
+
+    this.frame += 1;
   }
 }

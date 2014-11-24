@@ -109,10 +109,36 @@ class VMD_Animation {
     this.bone_motions = new List<VMD_BoneMotion>.generate(length, (int i){
       VMD_BoneMotion bone_motion = new VMD_BoneMotion();
       offset = bone_motion.parse(buffer, view, offset);
-      print(bone_motion);
       return bone_motion;
     });
 
     return offset;
   }
+
+  List<VMD_BoneMotion> getFrame(String bone_name, int frame) {
+    VMD_BoneMotion prev_frame = null;
+    VMD_BoneMotion next_frame = null;
+    for(int i = 0; i < this.bone_motions.length; i++) {
+      VMD_BoneMotion bone_motion = this.bone_motions[i];
+      if(bone_name != bone_motion.name) {
+        continue;
+      }
+
+      if(bone_motion.frame < frame) {
+        prev_frame = bone_motion;
+        continue;
+      }
+
+      next_frame = bone_motion;
+      break;
+    }
+
+    //not found
+    if(prev_frame == null && next_frame == null) {
+      return null;
+    }
+
+    return [prev_frame, next_frame];
+  }
+
 }
