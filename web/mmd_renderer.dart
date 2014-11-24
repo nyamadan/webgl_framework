@@ -91,7 +91,7 @@ class MMD_Renderer extends WebGLRenderer {
           2.0 * bone_index * half_bone.y + half_bone.y
       )),
       texture2D(bone_texture, vec2(
-          8.0 * half_bone.x + half_bone.x,
+          6.0 * half_bone.x + half_bone.x,
           2.0 * bone_index * half_bone.y + half_bone.y
       ))
     );
