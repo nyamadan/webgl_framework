@@ -11,7 +11,50 @@ import "package:vector_math/vector_math.dart";
 
 import "sjis_to_string.dart";
 
-part "mmd_parser.dart";
+part 'pmd_parser.dart';
+part 'vmd_parser.dart';
+
+class BoneNode {
+  Vector3 bone_position = new Vector3.zero();
+
+  Vector3 position = new Vector3.zero();
+  Vector3 scale = new Vector3(1.0, 1.0, 1.0);
+  Quaternion rotation = new Quaternion.identity();
+  Matrix4 transform = new Matrix4.identity();
+
+  List<BoneNode> children = new List<BoneNode>();
+
+  void update({BoneNode parent : null, bool recursive : true}) {
+    Matrix4 scale_matrix = new Matrix4.identity();
+    scale_matrix.scale(this.scale);
+
+    Matrix4 rotation_matrix = new Matrix4.identity();
+    rotation_matrix.setRotation(this.rotation.asRotationMatrix());
+
+    Matrix4 translate_matrix = new Matrix4.identity();
+    translate_matrix.setTranslation(this.position + this.bone_position);
+
+    this.transform = translate_matrix * rotation_matrix * scale_matrix;
+    if(parent != null) {
+      this.transform = parent.transform * this.transform;
+    }
+
+    if(recursive) {
+      this.children.forEach((BoneNode bone) {
+        bone.update(parent: this, recursive: true);
+      });
+    }
+  }
+
+  String toString() => ["{",[
+    "bone_position : ${this.bone_position}",
+    "position : ${this.position}",
+    "scale : ${this.scale}",
+    "rotation : ${this.rotation}",
+    "transform : ${this.transform}",
+    "children : ${this.children != null ? '...' : null}",
+  ].join(", "),"}"].join("");
+}
 
 class MMD_Renderer extends WebGLRenderer {
   static const String VS =
@@ -29,7 +72,7 @@ class MMD_Renderer extends WebGLRenderer {
   varying vec4 v_normal;
   varying vec2 v_coord;
 
-  const vec2 half_bone = vec2(0.5 / 4.0, 0.5 / 512.0);
+  const vec2 half_bone = vec2(0.5 / 4.0, 0.5 / 256.0);
 
   mat4 getBoneMatrix(float bone_index) {
     return mat4(
@@ -55,13 +98,10 @@ class MMD_Renderer extends WebGLRenderer {
   void main(void){
     mat4 bone1 = getBoneMatrix(bone.x);
     mat4 bone2 = getBoneMatrix(bone.y);
+    mat4 m = bone1 * bone.z + bone2 * (1.0 - bone.z);
+    vec4 p = m * vec4(position, 1.0);
 
-    vec4 p1 = bone1 * vec4(position, 1.0);
-    vec4 p2 = bone2 * vec4(position, 1.0);
-
-    vec4 p = p1 * bone.z + p2 * (1.0 - bone.z);
-
-    v_normal = vec4(normalize(mat3(model_matrix) * normal), 1.0);
+    v_normal = vec4(normalize(mat3(model_matrix * m) * normal), 1.0);
 
     v_coord = coord;
     gl_Position = projection_matrix * view_matrix * model_matrix * p;
@@ -103,6 +143,9 @@ class MMD_Renderer extends WebGLRenderer {
   WebGLTypedDataTexture bone_texture;
 
   PMD_Model pmd;
+  VMD_Animation vmd;
+
+  List<BoneNode> bones;
 
   MMD_Renderer({int width: 512, int height: 512}) : super(width: width, height: height)
   {
@@ -164,7 +207,7 @@ class MMD_Renderer extends WebGLRenderer {
     (new PMD_Model())
     .load("miku.pmd")
     .then((PMD_Model pmd){
-      pmd.normalizePositions();
+      pmd.setupSkinning();
 
       var position_list = pmd.createPositionList();
       var normal_list = pmd.createNormalList();
@@ -185,17 +228,6 @@ class MMD_Renderer extends WebGLRenderer {
         color : new Vector4(1.0, 1.0, 1.0, 1.0)
       );
 
-      Float32List bone_data = new Float32List(4 * 512 * 4);
-      for(int i = 0; i < pmd.bones.length; i++) {
-        PMD_Bone bone = pmd.bones[i];
-        int offset = i * 16;
-
-        Matrix4 m = new Matrix4.identity();
-        m.translate(bone.bone_head_pos);
-        bone_data.setRange(offset, offset + 16, m.storage);
-      }
-      this.bone_texture = new WebGLTypedDataTexture(gl, bone_data, width : 4, height : 512, type : GL.FLOAT);
-
       this.textures = new Map<String, WebGLCanvasTexture>();
       pmd.materials.forEach((PMD_Material material){
         if( material.texture_file_name.isEmpty || this.textures.containsKey(material.texture_file_name)) {
@@ -207,8 +239,46 @@ class MMD_Renderer extends WebGLRenderer {
         this.textures[material.texture_file_name] = texture;
       });
 
+      Float32List bone_data = new Float32List(4 * 256 * 4);
+      this._createBones(pmd.bones);
+      this.bone_texture = new WebGLTypedDataTexture(gl, bone_data, width : 4, height : 256, type : GL.FLOAT);
       this.pmd = pmd;
     });
+  }
+
+  void _createBones(List<PMD_Bone> pmd_bones) {
+    this.bones = new List<BoneNode>.generate(pmd_bones.length, (int i) => new BoneNode() );
+    for(int i = 0; i < pmd_bones.length; i++) {
+      PMD_Bone pmd_bone = pmd_bones[i];
+      BoneNode bone = bones[i];
+
+      if(pmd_bone.parent_bone_index >= 0) {
+        PMD_Bone parent_pmd_bone = pmd_bones[pmd_bone.parent_bone_index];
+        bone.bone_position = pmd_bone.bone_head_pos - parent_pmd_bone.bone_head_pos;
+      } else {
+        bone.bone_position = new Vector3.copy(pmd_bone.bone_head_pos);
+      }
+
+      for(int j = 0; j < pmd_bones.length; j++) {
+        if(pmd_bones[j].parent_bone_index == i) {
+          bone.children.add(bones[j]);
+        }
+      }
+    }
+  }
+
+  void _calcBone(List<BoneNode> bones, Float32List bone_data) {
+    bones.first.update();
+
+    for(int i = 0; i < bones.length; i++) {
+      BoneNode bone = bones[i];
+      int offset = i * 16;
+      bone_data.setRange(offset, offset + 16, bone.transform.storage);
+    }
+  }
+
+  void _refreshBoneTexture() {
+    this.bone_texture.refresh(gl);
   }
 
   void render(double ms) {
@@ -268,6 +338,9 @@ class MMD_Renderer extends WebGLRenderer {
       gl.bindBuffer(GL.ARRAY_BUFFER, this.bone_buffer.buffer);
       gl.vertexAttribPointer(this.attributes["bone"], 3, GL.FLOAT, false, 0, 0);
     }
+
+    this._calcBone(this.bones, this.bone_texture.data);
+    this._refreshBoneTexture();
 
     gl.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
 

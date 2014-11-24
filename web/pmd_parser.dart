@@ -309,7 +309,7 @@ class PMD_Model {
     offset = this._getMorphs(buffer, view, offset);
   }
 
-  void normalizePositions() {
+  void setupSkinning() {
     for(int i = 0; i < this.vertices.length; i++) {
       PMD_Vertex vertex = this.vertices[i];
       PMD_Bone bone1 = this.bones[vertex.bone1];
@@ -320,7 +320,7 @@ class PMD_Model {
     }
   }
 
-  void denormalizePositions() {
+  void revertSkinning() {
     for(int i = 0; i < this.vertices.length; i++) {
       PMD_Vertex vertex = this.vertices[i];
       PMD_Bone bone1 = this.bones[vertex.bone1];
