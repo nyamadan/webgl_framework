@@ -200,10 +200,19 @@ class MMD_Renderer extends WebGLRenderer {
       gl.enableVertexAttribArray(this.attributes["bone"]);
     }
 
-    this._load();
+    this._loadPMD();
+    this._loadVMD();
   }
 
-  void _load() {
+  void _loadVMD() {
+    (new VMD_Animation())
+    .load("miku.vmd")
+    .then((VMD_Animation vmd) {
+      print(vmd);
+    });
+  }
+
+  void _loadPMD() {
     (new PMD_Model())
     .load("miku.pmd")
     .then((PMD_Model pmd){
@@ -290,7 +299,7 @@ class MMD_Renderer extends WebGLRenderer {
     setPerspectiveMatrix(projection, Math.PI * 60.0 / 180.0, this.aspect, 0.1, 1000.0);
 
     Matrix4 view = new Matrix4.identity();
-    Vector3 look_from = new Vector3(0.0, 0.0, 25.0 + 25.0 * this.trackball.value);
+    Vector3 look_from = new Vector3(0.0, 0.0, 5.0 + 45.0 * this.trackball.value);
     setViewMatrix(view, look_from, new Vector3(0.0, 0.0, 0.0), new Vector3(0.0, 1.0, 0.0));
 
     Matrix4 rh = new Matrix4.identity();

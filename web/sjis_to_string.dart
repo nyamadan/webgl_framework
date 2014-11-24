@@ -11,10 +11,10 @@ String sjisArrayToString(Uint8List buffer) {
   var sb = new StringBuffer();
   int i = 0;
   int code;
-  while( (code = buffer[i++]) != null ) {
+  while( buffer.length > i && ((code = buffer[i++]) != null) ) {
     if (_single_byte.containsKey(code)) {
       sb.write(_single_byte[code]);
-    } else {
+    } else if(buffer.length > i) {
       code = (code << 8) + buffer[i++];
       if (_double_byte.containsKey(code)) {
         sb.write(_double_byte[code]);
