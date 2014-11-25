@@ -16,12 +16,15 @@ part 'vmd_parser.dart';
 
 class BoneNode {
   String name;
-  Vector3 bone_position = new Vector3.zero();
+  Vector3 original_bone_position = new Vector3.zero();
+  Vector3 relative_bone_position = new Vector3.zero();
+  Vector3 transformed_bone_position = new Vector3.zero();
 
   Vector3 position = new Vector3.zero();
   Vector3 scale = new Vector3(1.0, 1.0, 1.0);
   Quaternion rotation = new Quaternion.identity();
-  Matrix4 transform = new Matrix4.identity();
+  Matrix4 absolute_transform = new Matrix4.identity();
+  Matrix4 relative_transform = new Matrix4.identity();
 
   List<BoneNode> children = new List<BoneNode>();
 
@@ -32,13 +35,23 @@ class BoneNode {
     Matrix4 rotation_matrix = new Matrix4.identity();
     rotation_matrix.setRotation(this.rotation.asRotationMatrix());
 
-    Matrix4 translate_matrix = new Matrix4.identity();
-    translate_matrix.setTranslation(this.position + this.bone_position);
+    Matrix4 relative_translate_matrix = new Matrix4.identity();
+    relative_translate_matrix.setTranslation(this.position);
 
-    this.transform = translate_matrix * rotation_matrix * scale_matrix;
+    this.relative_transform = relative_translate_matrix * rotation_matrix * scale_matrix;
     if(parent != null) {
-      this.transform = parent.transform * this.transform;
+      this.relative_transform = parent.relative_transform * this.relative_transform;
     }
+
+    Matrix4 absolute_translate_matrix = new Matrix4.identity();
+    absolute_translate_matrix.setTranslation(this.position + this.relative_bone_position);
+
+    this.absolute_transform = absolute_translate_matrix * rotation_matrix * scale_matrix;
+    if(parent != null) {
+      this.absolute_transform = parent.absolute_transform * this.absolute_transform;
+    }
+
+    this.transformed_bone_position = new Vector3.copy(this.absolute_transform.getColumn(3).xyz);
 
     if(recursive) {
       this.children.forEach((BoneNode bone) {
@@ -49,11 +62,14 @@ class BoneNode {
 
   String toString() => ["{",[
     "name : ${this.name}",
-    "bone_position : ${this.bone_position}",
+    "relative_bone_position : ${this.relative_bone_position}",
+    "transformed_bone_position : ${this.transformed_bone_position}",
+    "original_bone_position : ${this.original_bone_position}",
     "position : ${this.position}",
     "scale : ${this.scale}",
     "rotation : ${this.rotation}",
-    "transform : ${this.transform}",
+    "absolute_transform : ${this.absolute_transform}",
+    "relative_transform : ${this.relative_transform}",
     "children : ${this.children != null ? '...' : null}",
   ].join(", "),"}"].join("");
 }
@@ -74,9 +90,9 @@ class MMD_Renderer extends WebGLRenderer {
   varying vec4 v_normal;
   varying vec2 v_coord;
 
-  const vec2 half_bone = vec2(0.5 / 4.0, 0.5 / 256.0);
+  const vec2 half_bone = vec2(0.5 / 8.0, 0.5 / 256.0);
 
-  mat4 getBoneMatrix(float bone_index) {
+  mat4 getTransformMatrix(float bone_index) {
     return mat4(
       texture2D(bone_texture, vec2(
           0.0 * half_bone.x + half_bone.x,
@@ -97,16 +113,42 @@ class MMD_Renderer extends WebGLRenderer {
     );
   }
 
-  void main(void){
-    mat4 bone1 = getBoneMatrix(bone.x);
-    mat4 bone2 = getBoneMatrix(bone.y);
-    mat4 m = bone1 * bone.z + bone2 * (1.0 - bone.z);
-    vec4 p = m * vec4(position, 1.0);
+  vec4 getBonePosition(float bone_index) {
+    return texture2D(bone_texture, vec2(
+        8.0 * half_bone.x + half_bone.x,
+        2.0 * bone_index * half_bone.y + half_bone.y
+    ));
+  }
 
+  vec4 getTransformedBonePosition(float bone_index) {
+    return texture2D(bone_texture, vec2(
+        10.0 * half_bone.x + half_bone.x,
+        2.0 * bone_index * half_bone.y + half_bone.y
+    ));
+  }
+
+  void main(void){
+    float weight = bone.z;
+    mat4 transform1 = getTransformMatrix(bone.x);
+    mat4 transform2 = getTransformMatrix(bone.y);
+
+    vec4 bone1 = getBonePosition(bone.x);
+    vec4 bone2 = getBonePosition(bone.y);
+
+    vec4 transformed_bone1 = getTransformedBonePosition(bone.x);
+    vec4 transformed_bone2 = getTransformedBonePosition(bone.y);
+
+    vec4 v1 = vec4(position, 1.0) - bone1;
+    vec4 v2 = vec4(position, 1.0) - bone2;
+
+    vec4 p1 = (transform1 * v1) + transformed_bone1;
+    vec4 p2 = (transform2 * v2) + transformed_bone2;
+
+    mat4 m = transform1 * weight + transform2 * (1.0 - weight);
     v_normal = vec4(normalize(mat3(model_matrix * m) * normal), 1.0);
 
     v_coord = coord;
-    gl_Position = projection_matrix * view_matrix * model_matrix * p;
+    gl_Position = projection_matrix * view_matrix * model_matrix * mix(p2, p1, weight);
   }
   """;
 
@@ -203,6 +245,8 @@ class MMD_Renderer extends WebGLRenderer {
       gl.enableVertexAttribArray(this.attributes["bone"]);
     }
 
+    this.trackball.value = 1.0;
+
     this._loadPMD();
     this._loadVMD();
   }
@@ -219,8 +263,6 @@ class MMD_Renderer extends WebGLRenderer {
     (new PMD_Model())
     .load("miku.pmd")
     .then((PMD_Model pmd){
-      pmd.setupSkinning();
-
       var position_list = pmd.createPositionList();
       var normal_list = pmd.createNormalList();
       var coord_list = pmd.createCoordList();
@@ -251,9 +293,9 @@ class MMD_Renderer extends WebGLRenderer {
         this.textures[material.texture_file_name] = texture;
       });
 
-      Float32List bone_data = new Float32List(4 * 256 * 4);
+      Float32List bone_data = new Float32List(8 * 256 * 4);
       this._createBoneNodes(pmd.bones);
-      this.bone_texture = new WebGLTypedDataTexture(gl, bone_data, width : 4, height : 256, type : GL.FLOAT);
+      this.bone_texture = new WebGLTypedDataTexture(gl, bone_data, width : 8, height : 256, type : GL.FLOAT);
       this.pmd = pmd;
     });
   }
@@ -264,12 +306,13 @@ class MMD_Renderer extends WebGLRenderer {
       PMD_Bone pmd_bone = pmd_bones[i];
 
       bone.name = pmd_bone.name;
+      bone.original_bone_position = new Vector3.copy(pmd_bone.bone_head_pos);
 
       if(pmd_bone.parent_bone_index >= 0) {
         PMD_Bone parent_pmd_bone = pmd_bones[pmd_bone.parent_bone_index];
-        bone.bone_position = pmd_bone.bone_head_pos - parent_pmd_bone.bone_head_pos;
+        bone.relative_bone_position = pmd_bone.bone_head_pos - parent_pmd_bone.bone_head_pos;
       } else {
-        bone.bone_position = new Vector3.copy(pmd_bone.bone_head_pos);
+        bone.relative_bone_position = new Vector3.copy(pmd_bone.bone_head_pos);
       }
       return bone;
     });
@@ -354,8 +397,15 @@ class MMD_Renderer extends WebGLRenderer {
 
     for(int i = 0; i < bones.length; i++) {
       BoneNode bone = bones[i];
-      int offset = i * 16;
-      bone_data.setRange(offset, offset + 16, bone.transform.storage);
+      int offset = i * 32;
+
+      bone_data.setRange(offset, offset + 16, bone.relative_transform.storage); offset += 16;
+
+      bone_data.setRange(offset, offset + 3, bone.original_bone_position.storage); offset += 3;
+      bone_data[offset] = 1.0; offset += 1;
+
+      bone_data.setRange(offset, offset + 3, bone.transformed_bone_position.storage); offset += 3;
+      bone_data[offset] = 1.0; offset += 1;
     }
   }
 
@@ -460,6 +510,6 @@ class MMD_Renderer extends WebGLRenderer {
       gl.drawElements(GL.TRIANGLES, index_buffer.data.length, GL.UNSIGNED_SHORT, 0);
     }
 
-    this.frame += 1;
+    this.frame = (this.frame + 1) % 180;
   }
 }
