@@ -26,9 +26,31 @@ class BoneNode {
   Matrix4 absolute_transform = new Matrix4.identity();
   Matrix4 relative_transform = new Matrix4.identity();
 
+  BoneNode parent = null;
   List<BoneNode> children = new List<BoneNode>();
 
-  void update({BoneNode parent : null, bool recursive : true}) {
+  void applyVMD(VMD_Animation vmd, int frame) {
+    List<VMD_BoneMotion> motions = vmd.getFrame(this.name, frame);
+    if(motions != null) {
+      VMD_BoneMotion prev_frame = motions[0];
+      VMD_BoneMotion next_frame = motions[1];
+
+      if(prev_frame == null && next_frame != null) {
+        next_frame.rotation.copyTo(this.rotation);
+        next_frame.location.copyInto(this.position);
+      } else if(prev_frame != null && next_frame == null) {
+        prev_frame.rotation.copyTo(this.rotation);
+        prev_frame.location.copyInto(this.position);
+      } else {
+        double blend = (frame - prev_frame.frame) / (next_frame.frame - prev_frame.frame);
+
+        slerpQuaternion(prev_frame.rotation, next_frame.rotation, blend).copyTo(this.rotation);
+        (next_frame.location * blend + prev_frame.location * (1.0 - blend)).copyInto(this.position);
+      }
+    }
+  }
+
+  void update({bool recursive : true}) {
     Matrix4 scale_matrix = new Matrix4.identity();
     scale_matrix.scale(this.scale);
 
@@ -39,23 +61,23 @@ class BoneNode {
     relative_translate_matrix.setTranslation(this.position);
 
     this.relative_transform = relative_translate_matrix * rotation_matrix * scale_matrix;
-    if(parent != null) {
-      this.relative_transform = parent.relative_transform * this.relative_transform;
+    if(this.parent != null) {
+      this.relative_transform = this.parent.relative_transform * this.relative_transform;
     }
 
     Matrix4 absolute_translate_matrix = new Matrix4.identity();
     absolute_translate_matrix.setTranslation(this.position + this.relative_bone_position);
 
     this.absolute_transform = absolute_translate_matrix * rotation_matrix * scale_matrix;
-    if(parent != null) {
-      this.absolute_transform = parent.absolute_transform * this.absolute_transform;
+    if(this.parent != null) {
+      this.absolute_transform = this.parent.absolute_transform * this.absolute_transform;
     }
 
     this.transformed_bone_position = new Vector3.copy(this.absolute_transform.getColumn(3).xyz);
 
     if(recursive) {
       this.children.forEach((BoneNode bone) {
-        bone.update(parent: this, recursive: true);
+        bone.update(recursive: true);
       });
     }
   }
@@ -90,7 +112,7 @@ class MMD_Renderer extends WebGLRenderer {
   varying vec4 v_normal;
   varying vec2 v_coord;
 
-  const vec2 half_bone = vec2(0.5 / 8.0, 0.5 / 256.0);
+  const vec2 half_bone = vec2(0.5 / 8.0, 0.5 / 512.0);
 
   mat4 getTransformMatrix(float bone_index) {
     return mat4(
@@ -294,9 +316,9 @@ class MMD_Renderer extends WebGLRenderer {
         this.textures[material.texture_file_name] = texture;
       });
 
-      Float32List bone_data = new Float32List(8 * 256 * 4);
+      Float32List bone_data = new Float32List(8 * 512 * 4);
       this._createBoneNodes(pmd.bones);
-      this.bone_texture = new WebGLTypedDataTexture(gl, bone_data, width : 8, height : 256, type : GL.FLOAT);
+      this.bone_texture = new WebGLTypedDataTexture(gl, bone_data, width : 8, height : 512, type : GL.FLOAT);
       this.pmd = pmd;
     });
   }
@@ -320,7 +342,11 @@ class MMD_Renderer extends WebGLRenderer {
 
     for(int i = 0; i < pmd_bones.length; i++) {
       PMD_Bone pmd_bone = pmd_bones[i];
-      BoneNode bone = bones[i];
+      BoneNode bone = this.bones[i];
+
+      if(0 <= pmd_bone.parent_bone_index  && pmd_bone.parent_bone_index < pmd_bones.length) {
+        bone.parent = this.bones[pmd_bone.parent_bone_index];
+      }
 
       for(int j = 0; j < pmd_bones.length; j++) {
         if(pmd_bones[j].parent_bone_index == i) {
@@ -330,72 +356,7 @@ class MMD_Renderer extends WebGLRenderer {
     }
   }
 
-  // http://www.euclideanspace.com/maths/algebra/realNormedAlgebra/quaternions/slerp/
-  Quaternion slerpQuaternion(Quaternion qa, Quaternion qb, double t) {
-    // quaternion to return
-    Quaternion qm = new Quaternion.identity();
-
-    // Calculate angle between them.
-    double cos_half_theta = qa.w * qb.w + qa.x * qb.x + qa.y * qb.y + qa.z * qb.z;
-
-    // if qa=qb or qa=-qb then theta = 0 and we can return qa
-    if (cos_half_theta.abs() >= 1.0){
-      qm.w = qa.w;
-      qm.x = qa.x;
-      qm.y = qa.y;
-      qm.z = qa.z;
-      return qm;
-    }
-
-    // Calculate temporary values.
-    double half_theta = Math.acos(cos_half_theta);
-    double sin_half_theta = Math.sqrt(1.0 - cos_half_theta*cos_half_theta);
-
-    // if theta = 180 degrees then result is not fully defined
-    // we could rotate around any axis normal to qa or qb
-    if (sin_half_theta.abs() < 0.001){ // fabs is floating point absolute
-      qm.w = (qa.w * 0.5 + qb.w * 0.5);
-      qm.x = (qa.x * 0.5 + qb.x * 0.5);
-      qm.y = (qa.y * 0.5 + qb.y * 0.5);
-      qm.z = (qa.z * 0.5 + qb.z * 0.5);
-      return qm;
-    }
-    double ratio_a = Math.sin((1 - t) * half_theta) / sin_half_theta;
-    double ratio_b = Math.sin(t * half_theta) / sin_half_theta;
-
-    //calculate Quaternion.
-    qm.w = (qa.w * ratio_a + qb.w * ratio_b);
-    qm.x = (qa.x * ratio_a + qb.x * ratio_b);
-    qm.y = (qa.y * ratio_a + qb.y * ratio_b);
-    qm.z = (qa.z * ratio_a + qb.z * ratio_b);
-
-    return qm;
-  }
-
-  void _calcBoneAnimation(List<BoneNode> bones, VMD_Animation vmd, int frame, Float32List bone_data) {
-    for(int i = 0; i < bones.length; i++) {
-      BoneNode bone = bones[i];
-
-      List<VMD_BoneMotion> motions = vmd.getFrame(bone.name, frame);
-      if(motions != null) {
-        VMD_BoneMotion prev_frame = motions[0];
-        VMD_BoneMotion next_frame = motions[1];
-
-        if(prev_frame == null && next_frame != null) {
-          next_frame.rotation.copyTo(bone.rotation);
-        } else if(prev_frame != null && next_frame == null) {
-          prev_frame.rotation.copyTo(bone.rotation);
-        } else {
-          double blend = (frame - prev_frame.frame) / (next_frame.frame - prev_frame.frame);
-
-          this.slerpQuaternion(prev_frame.rotation, next_frame.rotation, blend).copyTo(bone.rotation);
-        }
-
-      }
-    }
-
-    bones.first.update();
-
+  void _writeBoneTexture(List<BoneNode> bones, Float32List bone_data) {
     for(int i = 0; i < bones.length; i++) {
       BoneNode bone = bones[i];
       int offset = i * 32;
@@ -408,6 +369,37 @@ class MMD_Renderer extends WebGLRenderer {
       bone_data.setRange(offset, offset + 3, bone.transformed_bone_position.storage); offset += 3;
       bone_data[offset] = 1.0; offset += 1;
     }
+  }
+
+  void _updateIK(List<BoneNode> bones, PMD_IK ik) {
+    BoneNode ik_bone_node = bones[ik.bone_index];
+    BoneNode target_bone_node = bones[ik.target_bone_index];
+    List<BoneNode> child_bones = ik.child_bones.map((int i) => bones[i]).toList();
+
+    Vector3 ik_position = ik_bone_node.absolute_transform.getColumn(3).xyz;
+    Vector3 child_position = child_bones.first.absolute_transform.getColumn(3).xyz;
+    Vector3 target_position = target_bone_node.absolute_transform.getColumn(3).xyz;
+
+    BoneNode child_bone = child_bones[1];
+    Vector3 v1 = target_position - child_bone.absolute_transform.getColumn(3).xyz;
+    Vector3 v2 = ik_position - child_bone.absolute_transform.getColumn(3).xyz;
+
+    Vector3 axis = v1.cross(v2).normalize();
+    Quaternion q = new Quaternion.identity();
+    num theta = Math.acos(v1.dot(v2) / (v1.length * v2.length));
+    q.setAxisAngle(axis, theta);
+    (q * child_bone.rotation).copyTo(child_bone.rotation);
+    child_bone.update();
+  }
+
+  void _updateBoneAnimation(List<BoneNode> bones, List<PMD_IK> iks, VMD_Animation vmd, int frame, Float32List bone_data) {
+    bones.forEach((BoneNode bone) => bone.applyVMD(vmd, frame));
+    bones.where((BoneNode bone) => bone.parent == null).forEach((BoneNode bone) => bone.update());
+
+    //var ik = iks[3];
+    //this._updateIK(bones, ik);
+
+    this._writeBoneTexture(bones, bone_data);
   }
 
   void _refreshBoneTexture() {
@@ -474,7 +466,7 @@ class MMD_Renderer extends WebGLRenderer {
       gl.vertexAttribPointer(this.attributes["bone"], 3, GL.FLOAT, false, 0, 0);
     }
 
-    this._calcBoneAnimation(this.bones, this.vmd, frame, this.bone_texture.data);
+    this._updateBoneAnimation(this.bones, this.pmd.iks, this.vmd, frame, this.bone_texture.data);
     this._refreshBoneTexture();
 
     gl.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);

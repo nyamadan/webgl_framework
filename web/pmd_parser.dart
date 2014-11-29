@@ -211,7 +211,7 @@ class PMD_IK {
   String toString() => ["{", [
     "bone_index: ${this.bone_index}",
     "target_bone_index: ${this.target_bone_index}",
-    "position: ${this.iterations}",
+    "iterations: ${this.iterations}",
     "control_weight: ${this.control_weight}",
     "child_bones: ${this.child_bones}",
   ].join(", "), "}"].join("");
@@ -307,6 +307,9 @@ class PMD_Model {
     offset = this._getBones(buffer, view, offset);
     offset = this._getIKs(buffer, view, offset);
     offset = this._getMorphs(buffer, view, offset);
+
+    //print((new List<String>.generate(this.bones.length, (int i) => "$i: ${this.bones[i]}").join("\n")));
+    //print((new List<String>.generate(this.iks.length, (int i) => "$i: ${this.iks[i]}").join("\n")));
   }
 
   Uint16List createTriangleList([int index = null]) {
@@ -321,8 +324,8 @@ class PMD_Model {
     }
 
     var triangles = this.triangles
-    .getRange(offset, offset + this.materials[i].face_vert_count)
-    .toList()
+      .getRange(offset, offset + this.materials[i].face_vert_count)
+      .toList()
     ;
     return new Uint16List.fromList(triangles);
   }
