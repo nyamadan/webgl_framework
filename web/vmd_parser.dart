@@ -32,13 +32,13 @@ class VMD_BoneMotion {
     this.location = new Vector3(
       view.getFloat32(offset + 0, Endianness.LITTLE_ENDIAN),
       view.getFloat32(offset + 4, Endianness.LITTLE_ENDIAN),
-      view.getFloat32(offset + 8, Endianness.LITTLE_ENDIAN)
+      -view.getFloat32(offset + 8, Endianness.LITTLE_ENDIAN)
     );
     offset += 12;
 
     this.rotation = new Quaternion(
-      view.getFloat32(offset + 0, Endianness.LITTLE_ENDIAN),
-      view.getFloat32(offset + 4, Endianness.LITTLE_ENDIAN),
+      -view.getFloat32(offset + 0, Endianness.LITTLE_ENDIAN),
+      -view.getFloat32(offset + 4, Endianness.LITTLE_ENDIAN),
       view.getFloat32(offset + 8, Endianness.LITTLE_ENDIAN),
       view.getFloat32(offset + 12, Endianness.LITTLE_ENDIAN)
     );
@@ -110,6 +110,11 @@ class VMD_Animation {
       VMD_BoneMotion bone_motion = new VMD_BoneMotion();
       offset = bone_motion.parse(buffer, view, offset);
       return bone_motion;
+    });
+
+    // sort by frame
+    this.bone_motions.sort((VMD_BoneMotion frame1, VMD_BoneMotion frame2){
+      return frame1.frame - frame2.frame;
     });
 
     return offset;

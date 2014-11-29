@@ -190,7 +190,8 @@ class MMD_Renderer extends WebGLRenderer {
   VMD_Animation vmd;
 
   List<BoneNode> bones;
-  int frame = 0;
+
+  double start;
 
   MMD_Renderer({int width: 512, int height: 512}) : super(width: width, height: height)
   {
@@ -413,10 +414,16 @@ class MMD_Renderer extends WebGLRenderer {
     this.bone_texture.refresh(gl);
   }
 
-  void render(double ms) {
+  void render(double elapsed) {
     if (this.pmd == null || this.vmd == null) {
       return;
     }
+
+    if(this.start == null) {
+      this.start = elapsed;
+    }
+
+    int frame = ((elapsed - start) / 30.0).round() % 750;
 
     Matrix4 projection = new Matrix4.identity();
     setPerspectiveMatrix(projection, Math.PI * 60.0 / 180.0, this.aspect, 0.1, 1000.0);
@@ -425,14 +432,10 @@ class MMD_Renderer extends WebGLRenderer {
     Vector3 look_from = new Vector3(0.0, 0.0, 5.0 + 45.0 * this.trackball.value);
     setViewMatrix(view, look_from, new Vector3(0.0, 0.0, 0.0), new Vector3(0.0, 1.0, 0.0));
 
-    Matrix4 rh = new Matrix4.identity();
-    rh.storage[10] = -1.0;
-
     Matrix4 rot = new Matrix4.identity();
     rot.setRotation(this.trackball.rotation.asRotationMatrix());
 
-    Matrix4 model = rot * rh;
-
+    Matrix4 model = rot;
     Matrix4 mvp = projection * view * model;
 
     if (this.uniforms.containsKey("mvp_matrix")) {
@@ -471,7 +474,7 @@ class MMD_Renderer extends WebGLRenderer {
       gl.vertexAttribPointer(this.attributes["bone"], 3, GL.FLOAT, false, 0, 0);
     }
 
-    this._calcBoneAnimation(this.bones, this.vmd, this.frame, this.bone_texture.data);
+    this._calcBoneAnimation(this.bones, this.vmd, frame, this.bone_texture.data);
     this._refreshBoneTexture();
 
     gl.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
@@ -509,7 +512,5 @@ class MMD_Renderer extends WebGLRenderer {
       gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, index_buffer.buffer);
       gl.drawElements(GL.TRIANGLES, index_buffer.data.length, GL.UNSIGNED_SHORT, 0);
     }
-
-    this.frame = (this.frame + 1) % 180;
   }
 }

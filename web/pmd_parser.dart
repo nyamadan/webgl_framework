@@ -23,7 +23,7 @@ class PMD_Vertex {
     offset += 4;
     this.position.y = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
     offset += 4;
-    this.position.z = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+    this.position.z = -view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
     offset += 4;
 
     this.normal = new Vector3.zero();
@@ -31,7 +31,7 @@ class PMD_Vertex {
     offset += 4;
     this.normal.y = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
     offset += 4;
-    this.normal.z = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+    this.normal.z = -view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
     offset += 4;
 
     this.coord = new Vector2.zero();
@@ -307,28 +307,6 @@ class PMD_Model {
     offset = this._getBones(buffer, view, offset);
     offset = this._getIKs(buffer, view, offset);
     offset = this._getMorphs(buffer, view, offset);
-  }
-
-  void setupSkinning() {
-    for(int i = 0; i < this.vertices.length; i++) {
-      PMD_Vertex vertex = this.vertices[i];
-      PMD_Bone bone1 = this.bones[vertex.bone1];
-      PMD_Bone bone2 = this.bones[vertex.bone2];
-      num weight = vertex.bone_weight / 100;
-      Vector3 offset = (bone1.bone_head_pos * weight) + (bone2.bone_head_pos * (1.0 - weight));
-      vertex.position = vertex.position - offset;
-    }
-  }
-
-  void revertSkinning() {
-    for(int i = 0; i < this.vertices.length; i++) {
-      PMD_Vertex vertex = this.vertices[i];
-      PMD_Bone bone1 = this.bones[vertex.bone1];
-      PMD_Bone bone2 = this.bones[vertex.bone2];
-      num weight = vertex.bone_weight / 100;
-      Vector3 offset = (bone1.bone_head_pos * weight) + (bone2.bone_head_pos * (1.0 - weight));
-      vertex.position = vertex.position + offset;
-    }
   }
 
   Uint16List createTriangleList([int index = null]) {
