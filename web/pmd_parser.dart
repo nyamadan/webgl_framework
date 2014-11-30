@@ -160,7 +160,7 @@ class PMD_Bone {
     offset += 4;
     this.bone_head_pos.y = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
     offset += 4;
-    this.bone_head_pos.z = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+    this.bone_head_pos.z = -view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
     offset += 4;
 
     return offset;
