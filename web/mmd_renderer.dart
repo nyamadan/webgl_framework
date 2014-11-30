@@ -451,21 +451,23 @@ class MMD_Renderer extends WebGLRenderer {
     Vector3 v1 = target_position - child_bone.transformed_bone_position;
     Vector3 v2 = ik_position - child_bone.transformed_bone_position;
 
+    num theta = Math.acos(Math.min(Math.max(v1.dot(v2) / (v1.length * v2.length), -1.0), 1.0));
+    if(theta.abs() < 0.001) {
+      return;
+    }
+
     Vector3 axis = v1.cross(v2).normalize();
-    if(axis.storage.any((double n) => n.isNaN)) {
-      return;
-    }
-
-    num theta = 0.0;
-
-    theta = Math.acos(Math.min(Math.max(v1.dot(v2) / (v1.length * v2.length), -1.0), 1.0)) * ik.control_weight;
-    if(theta.isNaN) {
-      return;
-    }
-
     Quaternion q = new Quaternion.identity();
-    q.setAxisAngle(axis, theta);
+    q.setAxisAngle(axis, theta * ik.control_weight);
     child_bone.rotation.copyFrom(child_bone.rotation * q);
+
+    if(child_bone.name == "左ひざ") {
+      child_bone.rotation.copyFrom(new Quaternion.identity());
+    }
+
+    if(child_bone.name == "右ひざ") {
+      child_bone.rotation.copyFrom(new Quaternion.identity());
+    }
 
     child_bone.update();
   }
