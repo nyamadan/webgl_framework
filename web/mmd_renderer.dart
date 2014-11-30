@@ -458,7 +458,7 @@ class MMD_Renderer extends WebGLRenderer {
 
     num theta = 0.0;
 
-    theta = Math.acos(Math.min(Math.max(v1.dot(v2) / (v1.length * v2.length), 0.0), 1.0)) * ik.control_weight;
+    theta = Math.acos(Math.min(Math.max(v1.dot(v2) / (v1.length * v2.length), -1.0), 1.0)) * ik.control_weight;
     if(theta.isNaN) {
       return;
     }
