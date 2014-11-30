@@ -489,6 +489,10 @@ class MMD_Renderer extends WebGLRenderer {
         v.point_size = 5.0;
         v.color = new Vector4(1.0, 0.0, 0.0, 1.0);
       }
+
+      if(bone.bone_type == 4) {
+        v.color = new Vector4(1.0, 0.0, 0.0, 1.0);
+      }
       this.debug_vertices.add(v);
     });
 
