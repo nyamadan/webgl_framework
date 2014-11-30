@@ -8,6 +8,7 @@ import 'dart:web_gl' as GL;
 
 import "package:webgl_framework/webgl_framework.dart";
 import "package:vector_math/vector_math.dart";
+import "package:logging/logging.dart";
 
 import "sjis_to_string.dart";
 
@@ -97,6 +98,8 @@ class BoneNode {
 }
 
 class MMD_Renderer extends WebGLRenderer {
+  final Logger log = new Logger("MMD_Renderer");
+
   static const String VS =
   """
   attribute vec3 position;
@@ -371,33 +374,53 @@ class MMD_Renderer extends WebGLRenderer {
     }
   }
 
-  void _updateIK(List<BoneNode> bones, PMD_IK ik) {
+  void _updaceChildIK(BoneNode child_bone, List<BoneNode> bones, PMD_IK ik) {
     BoneNode ik_bone_node = bones[ik.bone_index];
     BoneNode target_bone_node = bones[ik.target_bone_index];
-    List<BoneNode> child_bones = ik.child_bones.map((int i) => bones[i]).toList();
 
-    Vector3 ik_position = ik_bone_node.absolute_transform.getColumn(3).xyz;
-    Vector3 child_position = child_bones.first.absolute_transform.getColumn(3).xyz;
-    Vector3 target_position = target_bone_node.absolute_transform.getColumn(3).xyz;
+    Vector3 target_position = target_bone_node.transformed_bone_position;
+    Vector3 ik_position = ik_bone_node.transformed_bone_position;
+    if(target_position.distanceToSquared(ik_position) < 0.001) {
+      return;
+    }
 
-    BoneNode child_bone = child_bones[1];
-    Vector3 v1 = target_position - child_bone.absolute_transform.getColumn(3).xyz;
-    Vector3 v2 = ik_position - child_bone.absolute_transform.getColumn(3).xyz;
+    Vector3 v1 = target_position - child_bone.transformed_bone_position;
+    Vector3 v2 = ik_position - child_bone.transformed_bone_position;
 
     Vector3 axis = v1.cross(v2).normalize();
+    if(axis.storage.any((double n) => n.isNaN)) {
+      return;
+    }
+
     Quaternion q = new Quaternion.identity();
     num theta = Math.acos(v1.dot(v2) / (v1.length * v2.length));
-    q.setAxisAngle(axis, theta);
-    (q * child_bone.rotation).copyTo(child_bone.rotation);
+    if(theta.isNaN) {
+      return;
+    }
+
+    q.setAxisAngle(axis, theta * ik.control_weight);
+    child_bone.rotation.copyFrom(q * child_bone.rotation);
     child_bone.update();
+  }
+
+  void _updateIK(List<BoneNode> bones, PMD_IK ik) {
+    List<BoneNode> child_bones = ik.child_bones.map((int i) => bones[i]).toList();
+    //this._updaceChildIK(child_bones[0], bones, ik);
+    for(int i = 0; i < ik.iterations; i++) {
+      BoneNode ik_bone_node = bones[ik.bone_index];
+      BoneNode target_bone_node = bones[ik.target_bone_index];
+
+      child_bones.forEach((BoneNode child_bone) => this._updaceChildIK(child_bone, bones, ik));
+    }
   }
 
   void _updateBoneAnimation(List<BoneNode> bones, List<PMD_IK> iks, VMD_Animation vmd, int frame, Float32List bone_data) {
     bones.forEach((BoneNode bone) => bone.applyVMD(vmd, frame));
     bones.where((BoneNode bone) => bone.parent == null).forEach((BoneNode bone) => bone.update());
 
-    //var ik = iks[3];
-    //this._updateIK(bones, ik);
+    //this._updateIK(bones, iks[2]);
+
+    iks.forEach((ik) => this._updateIK(bones, ik));
 
     this._writeBoneTexture(bones, bone_data);
   }

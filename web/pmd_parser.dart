@@ -269,6 +269,8 @@ class PMD_Morph {
 }
 
 class PMD_Model {
+  final Logger log = new Logger("PMD_Model");
+
   String name;
   String comment;
 
@@ -278,6 +280,16 @@ class PMD_Model {
   List<PMD_Bone> bones;
   List<PMD_IK> iks;
   List<PMD_Morph> morphs;
+
+  String toString() => ["{", [
+    "name: ${this.name}",
+    "comment: ${this.comment}",
+    "triangles: ${this.triangles != null ? "..." : null}",
+    "materials: ${this.materials != null ? "..." : null}",
+    "bones: ${this.bones != null ? "..." : null}",
+    "iks: ${this.iks != null ? "..." : null}",
+    "morphs: ${this.morphs != null ? "..." : null}",
+  ].join(", "), "}"].join("");
 
   Future<PMD_Model> load(String uri) {
     var completer = new Completer<PMD_Model>();
@@ -310,8 +322,18 @@ class PMD_Model {
     offset = this._getIKs(buffer, view, offset);
     offset = this._getMorphs(buffer, view, offset);
 
-    //print((new List<String>.generate(this.bones.length, (int i) => "$i: ${this.bones[i]}").join("\n")));
-    //print((new List<String>.generate(this.iks.length, (int i) => "$i: ${this.iks[i]}").join("\n")));
+    log.info(this);
+    for(int i = 0; i < this.bones.length; i++) {
+      PMD_Bone bone = this.bones[i];
+      String n = i.toString().padLeft(4, "0");
+      log.fine("$n: $bone");
+    }
+
+    for(int i = 0; i < this.iks.length; i++) {
+      PMD_IK ik = this.iks[i];
+      String n = i.toString().padLeft(4, "0");
+      log.fine("$n: $ik");
+    }
   }
 
   Uint16List createTriangleList([int index = null]) {
