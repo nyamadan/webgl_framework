@@ -284,9 +284,11 @@ class PMD_Model {
     var future = completer.future;
 
     var req = new HttpRequest();
-    req.responseType = "arraybuffer";
+    req.overrideMimeType("text\/plain; charset=x-user-defined");
     req.onLoad.listen((event){
-      ByteBuffer buffer = req.response;
+      var u8_list = new Uint8List.fromList(req.responseText.codeUnits);
+      ByteBuffer buffer = u8_list.buffer;
+
       this.parse(buffer);
       completer.complete(this);
     });
