@@ -462,11 +462,13 @@ class MMD_Renderer extends WebGLRenderer {
     child_bone.rotation.copyFrom(child_bone.rotation * q);
 
     if(child_bone.name == "左ひざ") {
-      child_bone.rotation.copyFrom(new Quaternion.identity());
+      Quaternion q = new Quaternion.identity();
+      child_bone.rotation.copyFrom(q);
     }
 
     if(child_bone.name == "右ひざ") {
-      child_bone.rotation.copyFrom(new Quaternion.identity());
+      Quaternion q = new Quaternion.identity();
+      child_bone.rotation.copyFrom(q);
     }
 
     child_bone.update();
