@@ -456,14 +456,17 @@ class MMD_Renderer extends WebGLRenderer {
       return;
     }
 
-    Quaternion q = new Quaternion.identity();
-    num theta = Math.acos(v1.dot(v2) / (v1.length * v2.length));
+    num theta = 0.0;
+
+    theta = Math.acos(Math.min(Math.max(v1.dot(v2) / (v1.length * v2.length), 0.0), 1.0)) * ik.control_weight;
     if(theta.isNaN) {
       return;
     }
 
-    q.setAxisAngle(axis, theta * ik.control_weight);
+    Quaternion q = new Quaternion.identity();
+    q.setAxisAngle(axis, theta);
     child_bone.rotation.copyFrom(child_bone.rotation * q);
+
     child_bone.update();
   }
 
@@ -479,14 +482,13 @@ class MMD_Renderer extends WebGLRenderer {
 
   void _updateBoneAnimation(List<BoneNode> bones, List<PMD_IK> iks, VMD_Animation vmd, int frame, Float32List bone_data) {
     bones.forEach((BoneNode bone) => bone.applyVMD(vmd, frame));
+
+    //bones[69].rotation.setAxisAngle(new Vector3(1.0, 0.0, 0.0), 1.0);
     bones.where((BoneNode bone) => bone.parent == null).forEach((BoneNode bone) => bone.update());
 
-    //this._updateIK(bones, iks[2]);
+    iks.forEach((ik) => this._updateIK(bones, ik));
 
-    iks.forEach((ik) {
-      this._updateIK(bones, ik);
-    });
-
+    //debug output
     bones.forEach((bone){
       var v = new DebugVertex(bone.transformed_bone_position);
       if(bone.bone_type == 2) {
@@ -508,7 +510,9 @@ class MMD_Renderer extends WebGLRenderer {
   }
 
   void _renderDebug(Matrix4 mvp) {
-    if(this.debug_vertices != null && this.debug_vertices.isNotEmpty) {
+    bool enable_vertex = this.debug_vertices != null && this.debug_vertices.isNotEmpty;
+
+    if(enable_vertex) {
       gl.disable(GL.DEPTH_TEST);
       gl.useProgram(this.debug_program);
 
