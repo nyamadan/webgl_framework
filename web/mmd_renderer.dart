@@ -252,14 +252,17 @@ class MMD_Renderer extends WebGLRenderer {
   Map<String, int> debug_attributes;
   Map<String, GL.UniformLocation> debug_uniforms;
 
-  GL.Program program;
-  Map<String, int> attributes;
-  Map<String, GL.UniformLocation> uniforms;
-
   //debug buffer
   WebGLArrayBuffer debug_position_buffer;
   WebGLArrayBuffer debug_color_buffer;
   WebGLArrayBuffer debug_poinr_size_buffer;
+
+  //debug info
+  List<DebugVertex> debug_vertices;
+
+  GL.Program program;
+  Map<String, int> attributes;
+  Map<String, GL.UniformLocation> uniforms;
 
   WebGLArrayBuffer position_buffer;
   WebGLArrayBuffer normal_buffer;
@@ -270,9 +273,6 @@ class MMD_Renderer extends WebGLRenderer {
   Map<String, WebGLCanvasTexture> textures;
   WebGLCanvasTexture white_texture;
   WebGLTypedDataTexture bone_texture;
-
-  //debug info
-  List<DebugVertex> debug_vertices;
 
   PMD_Model pmd;
   VMD_Animation vmd;
@@ -285,26 +285,6 @@ class MMD_Renderer extends WebGLRenderer {
   {
     gl.getExtension("OES_texture_float");
     gl.getExtension("OES_texture_float_linear");
-
-    var debug_vs = this.compileVertexShader(DEBUG_VS);
-    var debug_fs = this.compileFragmentShader(DEBUG_FS);
-    this.debug_program = this.linkProgram(debug_vs, debug_fs);
-    gl.deleteShader(debug_vs);
-    gl.deleteShader(debug_fs);
-
-    this.debug_attributes = this.getAttributes(this.debug_program, [
-      "position",
-      "color",
-      "point_size",
-    ]);
-
-    this.debug_uniforms = this.getUniformLocations(this.debug_program, [
-      "mvp_matrix",
-    ]);
-
-    this.debug_color_buffer = new WebGLArrayBuffer(gl, new Float32List.fromList([]));
-    this.debug_position_buffer = new WebGLArrayBuffer(gl, new Float32List.fromList([]));
-    this.debug_poinr_size_buffer = new WebGLArrayBuffer(gl, new Float32List.fromList([]));
 
     var vs = this.compileVertexShader(VS);
     var fs = this.compileFragmentShader(FS);
@@ -329,10 +309,35 @@ class MMD_Renderer extends WebGLRenderer {
       "projection_matrix",
     ]);
 
+    this._initializeDebugShader();
+
     this.trackball.value = 1.0;
 
     this._loadPMD();
     this._loadVMD();
+  }
+
+  void _initializeDebugShader()
+  {
+    var debug_vs = this.compileVertexShader(DEBUG_VS);
+    var debug_fs = this.compileFragmentShader(DEBUG_FS);
+    this.debug_program = this.linkProgram(debug_vs, debug_fs);
+    gl.deleteShader(debug_vs);
+    gl.deleteShader(debug_fs);
+
+    this.debug_attributes = this.getAttributes(this.debug_program, [
+      "position",
+      "color",
+      "point_size",
+    ]);
+
+    this.debug_uniforms = this.getUniformLocations(this.debug_program, [
+      "mvp_matrix",
+    ]);
+
+    this.debug_color_buffer = new WebGLArrayBuffer(gl, new Float32List.fromList([]));
+    this.debug_position_buffer = new WebGLArrayBuffer(gl, new Float32List.fromList([]));
+    this.debug_poinr_size_buffer = new WebGLArrayBuffer(gl, new Float32List.fromList([]));
   }
 
   void _loadVMD() {
@@ -458,13 +463,12 @@ class MMD_Renderer extends WebGLRenderer {
     }
 
     q.setAxisAngle(axis, theta * ik.control_weight);
-    child_bone.rotation.copyFrom(q * child_bone.rotation);
+    child_bone.rotation.copyFrom(child_bone.rotation * q);
     child_bone.update();
   }
 
   void _updateIK(List<BoneNode> bones, PMD_IK ik) {
     List<BoneNode> child_bones = ik.child_bones.map((int i) => bones[i]).toList();
-    //this._updaceChildIK(child_bones[0], bones, ik);
     for(int i = 0; i < ik.iterations; i++) {
       BoneNode ik_bone_node = bones[ik.bone_index];
       BoneNode target_bone_node = bones[ik.target_bone_index];
@@ -501,6 +505,50 @@ class MMD_Renderer extends WebGLRenderer {
 
   void _refreshBoneTexture() {
     this.bone_texture.refresh(gl);
+  }
+
+  void _renderDebug(Matrix4 mvp) {
+    if(this.debug_vertices != null && this.debug_vertices.isNotEmpty) {
+      gl.disable(GL.DEPTH_TEST);
+      gl.useProgram(this.debug_program);
+
+      Float32List position_data = new Float32List(this.debug_vertices.length * 3);
+      Float32List color_data = new Float32List(this.debug_vertices.length * 4);
+      Float32List point_size_data = new Float32List(this.debug_vertices.length);
+      for(int i = 0; i < this.debug_vertices.length; i++) {
+        position_data.setRange(i * 3, (i + 1) * 3, this.debug_vertices[i].position.storage);
+        color_data.setRange(i * 4, (i + 1) * 4, this.debug_vertices[i].color.storage);
+        point_size_data[i] = this.debug_vertices[i].point_size;
+      }
+
+      debug_position_buffer.setData(gl, position_data);
+      debug_color_buffer.setData(gl, color_data);
+      debug_poinr_size_buffer.setData(gl, point_size_data);
+
+      if (this.debug_uniforms.containsKey("mvp_matrix")) {
+        gl.uniformMatrix4fv(this.debug_uniforms["mvp_matrix"], false, mvp.storage);
+      }
+
+      if (this.debug_attributes.containsKey("color")) {
+        gl.enableVertexAttribArray(this.debug_attributes["color"]);
+        gl.bindBuffer(GL.ARRAY_BUFFER, this.debug_color_buffer.buffer);
+        gl.vertexAttribPointer(this.debug_attributes["color"], 4, GL.FLOAT, false, 0, 0);
+      }
+
+      if (this.debug_attributes.containsKey("point_size")) {
+        gl.enableVertexAttribArray(this.debug_attributes["point_size"]);
+        gl.bindBuffer(GL.ARRAY_BUFFER, this.debug_poinr_size_buffer.buffer);
+        gl.vertexAttribPointer(this.debug_attributes["point_size"], 1, GL.FLOAT, false, 0, 0);
+      }
+
+      if (this.debug_attributes.containsKey("position")) {
+        gl.enableVertexAttribArray(this.debug_attributes["position"]);
+        gl.bindBuffer(GL.ARRAY_BUFFER, this.debug_position_buffer.buffer);
+        gl.vertexAttribPointer(this.debug_attributes["position"], 3, GL.FLOAT, false, 0, 0);
+
+        gl.drawArrays(GL.POINTS, 0, this.debug_vertices.length);
+      }
+    }
   }
 
   void render(double elapsed) {
@@ -618,46 +666,6 @@ class MMD_Renderer extends WebGLRenderer {
       gl.drawElements(GL.TRIANGLES, index_buffer.data.length, GL.UNSIGNED_SHORT, 0);
     }
 
-    if(this.debug_vertices != null && this.debug_vertices.isNotEmpty) {
-      gl.disable(GL.DEPTH_TEST);
-      gl.useProgram(this.debug_program);
-
-      Float32List position_data = new Float32List(this.debug_vertices.length * 3);
-      Float32List color_data = new Float32List(this.debug_vertices.length * 4);
-      Float32List point_size_data = new Float32List(this.debug_vertices.length);
-      for(int i = 0; i < this.debug_vertices.length; i++) {
-        position_data.setRange(i * 3, (i + 1) * 3, this.debug_vertices[i].position.storage);
-        color_data.setRange(i * 4, (i + 1) * 4, this.debug_vertices[i].color.storage);
-        point_size_data[i] = this.debug_vertices[i].point_size;
-      }
-
-      debug_position_buffer.setData(gl, position_data);
-      debug_color_buffer.setData(gl, color_data);
-      debug_poinr_size_buffer.setData(gl, point_size_data);
-
-      if (this.debug_uniforms.containsKey("mvp_matrix")) {
-        gl.uniformMatrix4fv(this.debug_uniforms["mvp_matrix"], false, mvp.storage);
-      }
-
-      if (this.debug_attributes.containsKey("color")) {
-        gl.enableVertexAttribArray(this.debug_attributes["color"]);
-        gl.bindBuffer(GL.ARRAY_BUFFER, this.debug_color_buffer.buffer);
-        gl.vertexAttribPointer(this.debug_attributes["color"], 4, GL.FLOAT, false, 0, 0);
-      }
-
-      if (this.debug_attributes.containsKey("point_size")) {
-        gl.enableVertexAttribArray(this.debug_attributes["point_size"]);
-        gl.bindBuffer(GL.ARRAY_BUFFER, this.debug_poinr_size_buffer.buffer);
-        gl.vertexAttribPointer(this.debug_attributes["point_size"], 1, GL.FLOAT, false, 0, 0);
-      }
-
-      if (this.debug_attributes.containsKey("position")) {
-        gl.enableVertexAttribArray(this.debug_attributes["position"]);
-        gl.bindBuffer(GL.ARRAY_BUFFER, this.debug_position_buffer.buffer);
-        gl.vertexAttribPointer(this.debug_attributes["position"], 3, GL.FLOAT, false, 0, 0);
-
-        gl.drawArrays(GL.POINTS, 0, this.debug_vertices.length);
-      }
-    }
+    this._renderDebug(mvp);
   }
 }
