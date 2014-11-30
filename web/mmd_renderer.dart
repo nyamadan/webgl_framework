@@ -57,18 +57,18 @@ class BoneNode {
     Matrix4 rotation_matrix = new Matrix4.identity();
     rotation_matrix.setRotation(this.rotation.asRotationMatrix());
 
-    Matrix4 relative_translate_matrix = new Matrix4.identity();
-    relative_translate_matrix.setTranslation(this.position);
+    Matrix4 translate_matrix = new Matrix4.identity();
+    translate_matrix.setTranslation(this.position);
 
-    this.relative_transform = relative_translate_matrix * rotation_matrix * scale_matrix;
+    this.relative_transform = translate_matrix * rotation_matrix * scale_matrix;
     if(this.parent != null) {
       this.relative_transform = this.parent.relative_transform * this.relative_transform;
     }
 
-    Matrix4 absolute_translate_matrix = new Matrix4.identity();
-    absolute_translate_matrix.setTranslation(this.position + this.relative_bone_position);
+    Matrix4 bone_translate_matrix = new Matrix4.identity();
+    bone_translate_matrix.setTranslation(this.relative_bone_position);
 
-    this.absolute_transform = absolute_translate_matrix * rotation_matrix * scale_matrix;
+    this.absolute_transform = bone_translate_matrix * translate_matrix * rotation_matrix * scale_matrix;
     if(this.parent != null) {
       this.absolute_transform = this.parent.absolute_transform * this.absolute_transform;
     }
