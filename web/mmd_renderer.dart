@@ -400,18 +400,21 @@ class MMD_Renderer extends WebGLRenderer {
 
     Vector3 axis = v1.cross(v2).normalize();
     Quaternion q = new Quaternion.identity();
-    q.setAxisAngle(axis, theta * ik.control_weight);
+    if(child_bone.name == "左ひざ") {
+      Vector3 leg_axis = new Vector3(1.0, 0.0, 0.0);
+      if(axis.dot(leg_axis) > 0.0) {
+        q.setAxisAngle(leg_axis, theta * ik.control_weight);
+      }
+    }else if(child_bone.name == "右ひざ") {
+      Vector3 leg_axis = new Vector3(1.0, 0.0, 0.0);
+      if(axis.dot(leg_axis) > 0.0) {
+        q.setAxisAngle(leg_axis, theta * ik.control_weight);
+      }
+    } else {
+      q.setAxisAngle(axis, theta * ik.control_weight);
+    }
     child_bone.rotation.copyFrom(child_bone.rotation * q);
 
-    if(child_bone.name == "左ひざ") {
-      Quaternion q = new Quaternion.identity();
-      //child_bone.rotation.copyFrom(q);
-    }
-
-    if(child_bone.name == "右ひざ") {
-      Quaternion q = new Quaternion.identity();
-      //child_bone.rotation.copyFrom(q);
-    }
 
     child_bone.update();
   }
