@@ -9,7 +9,7 @@ void main() {
   Logger.root.onRecord.listen((LogRecord rec) {
     print('${rec.level.name}: ${rec.time}: ${rec.message}');
   });
-  var renderer = new TeapotRenderer();
+  var renderer = new TeapotRenderer(512, 512);
 
   document.querySelector("body").append(renderer.dom);
 
