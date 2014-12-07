@@ -51,8 +51,7 @@ class TeapotRenderer extends WebGLRenderer {
   WebGLElementArrayBuffer index_buffer;
   WebGLCanvasTexture texture;
 
-  TeapotRenderer({int width: 512, int height: 512}) : super(width: width, height: height)
-  {
+  void _initialize() {
     var vs = this.compileVertexShader(VS);
     var fs = this.compileFragmentShader(FS);
     this.program = this.linkProgram(vs, fs);
@@ -100,6 +99,21 @@ class TeapotRenderer extends WebGLRenderer {
     this.texture.load(gl, "pattern.png");
 
     gl.activeTexture(GL.TEXTURE0);
+  }
+
+  TeapotRenderer(int width, int height)
+  {
+    this.initContext(width, height);
+    this.initTrackball();
+
+    this._initialize();
+  }
+
+  TeapotRenderer.copy(WebGLRenderer src) {
+    this.gl = src.gl;
+    this.dom = src.dom;
+
+    this._initialize();
   }
 
   void render(double ms) {
