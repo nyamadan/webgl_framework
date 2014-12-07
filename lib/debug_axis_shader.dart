@@ -3,14 +3,19 @@ part of webgl_framework;
 class DebugAxis {
   Vector3 position = new Vector3.zero();
   Vector3 size = new Vector3(1.0, 1.0, 1.0);
+  Quaternion rotation = new Quaternion.identity();
 
-  DebugAxis(Vector3 position, {Vector4 color, Vector3 size}) {
+  DebugAxis(Vector3 position, {Vector4 color, Vector3 size, Quaternion rotation}) {
     if(position != null) {
       this.position = position;
     }
 
     if(size != null) {
       this.size = size;
+    }
+
+    if(rotation != null) {
+      this.rotation = rotation;
     }
   }
 }
@@ -104,22 +109,29 @@ class DebugAxisShader extends WebGLRenderer
     Float32List position_data = new Float32List(this.axises.length * 3 * 6);
     Float32List color_data = new Float32List(this.axises.length * 4 * 6);
     for(int i = 0; i < this.axises.length; i++) {
-      Vector3 o = this.axises[i].position;
-      Vector3 p = this.axises[i].size;
+      DebugAxis axis = this.axises[i];
+      Vector3 origin = axis.position;
+      Vector3 v = axis.size;
 
       int position_offset = i * 18;
       int color_offset = i * 24;
 
-      Vector3 position_x = new Vector3(o.x + p.x, o.y, o.z);
-      position_data.setRange(position_offset + 0, position_offset + 3, o.storage);
+      Vector3 position_x = new Vector3(v.x, 0.0, 0.0);
+      axis.rotation.rotate(position_x);
+      position_x.add(origin);
+      position_data.setRange(position_offset + 0, position_offset + 3, origin.storage);
       position_data.setRange(position_offset + 3, position_offset + 6, position_x.storage);
 
-      Vector3 position_y = new Vector3(o.x, o.y + p.y, o.z);
-      position_data.setRange(position_offset + 6, position_offset + 9, o.storage);
+      Vector3 position_y = new Vector3(0.0, v.y, 0.0);
+      axis.rotation.rotate(position_y);
+      position_y.add(origin);
+      position_data.setRange(position_offset + 6, position_offset + 9, origin.storage);
       position_data.setRange(position_offset + 9, position_offset + 12, position_y.storage);
 
-      Vector3 position_z = new Vector3(o.x, o.y, o.z + p.z);
-      position_data.setRange(position_offset + 12, position_offset + 15, o.storage);
+      Vector3 position_z = new Vector3(0.0, 0.0, v.z);
+      axis.rotation.rotate(position_z);
+      position_z.add(origin);
+      position_data.setRange(position_offset + 12, position_offset + 15, origin.storage);
       position_data.setRange(position_offset + 15, position_offset + 18, position_z.storage);
 
       Vector4 color_x = new Vector4(1.0, 0.0, 0.0, 1.0);
