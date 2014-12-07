@@ -14,3 +14,4 @@ part "webgl_buffer.dart";
 part "webgl_exception.dart";
 part "webgl_texture.dart";
 part "webgl_renderer.dart";
+part "debug_shader.dart";

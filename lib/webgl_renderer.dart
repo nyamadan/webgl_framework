@@ -8,7 +8,7 @@ abstract class WebGLRenderer
   _Trackball trackball;
 
   GL.RenderingContext gl;
-  void _initContext(int width, int height)
+  void initContext(int width, int height)
   {
     this.dom = document.createElement("canvas");
     this.dom.width = width;
@@ -59,7 +59,7 @@ abstract class WebGLRenderer
     return program;
   }
 
-  void _initTrackball() {
+  void initTrackball() {
     this.trackball = new _Trackball(this.dom);
   }
 
@@ -85,11 +85,6 @@ abstract class WebGLRenderer
       }
     });
     return attributes;
-  }
-
-  WebGLRenderer({int width : 512, int height : 512}) {
-    this._initContext(width, height);
-    this._initTrackball();
   }
 
   void render(double ms);
