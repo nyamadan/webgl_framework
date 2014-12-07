@@ -10,7 +10,7 @@ void main() {
     print('${rec.level.name}: ${rec.time}: ${rec.message}');
   });
 
-  var renderer = new MMD_Renderer();
+  var renderer = new MMD_Renderer(512, 512);
 
   document.querySelector("body").append(renderer.dom);
 

@@ -99,57 +99,8 @@ class BoneNode {
   ].join(", "),"}"].join("");
 }
 
-class DebugVertex {
-  Vector3 position = new Vector3.zero();
-  Vector4 color = new Vector4(1.0, 1.0, 1.0, 1.0);
-  double point_size = 3.0;
-
-  DebugVertex(Vector3 position, {Vector4 color, double point_size}) {
-    if(position != null) {
-      this.position = position;
-    }
-
-    if(color != null) {
-      this.color = color;
-    }
-
-    if(point_size != null) {
-      this.point_size = point_size;
-    }
-  }
-}
-
 class MMD_Renderer extends WebGLRenderer {
   final Logger log = new Logger("MMD_Renderer");
-
-  static const String DEBUG_VS =
-  """
-  uniform mat4 mvp_matrix;
-
-  attribute vec3 position;
-  attribute vec4 color;
-  attribute float point_size;
-
-  varying vec4 v_color;
-
-  void main(void){
-    v_color = color;
-
-    gl_PointSize = point_size;
-    gl_Position = mvp_matrix * vec4(position, 1.0);
-  }
-  """;
-
-  static const String DEBUG_FS =
-  """
-  precision mediump float;
-
-  varying vec4 v_color;
-
-  void main(void){
-    gl_FragColor = v_color;
-  }
-  """;
 
   static const String VS =
   """
@@ -247,19 +198,6 @@ class MMD_Renderer extends WebGLRenderer {
   }
   """;
 
-  //debug program
-  GL.Program debug_program;
-  Map<String, int> debug_attributes;
-  Map<String, GL.UniformLocation> debug_uniforms;
-
-  //debug buffer
-  WebGLArrayBuffer debug_position_buffer;
-  WebGLArrayBuffer debug_color_buffer;
-  WebGLArrayBuffer debug_poinr_size_buffer;
-
-  //debug info
-  List<DebugVertex> debug_vertices;
-
   GL.Program program;
   Map<String, int> attributes;
   Map<String, GL.UniformLocation> uniforms;
@@ -279,10 +217,11 @@ class MMD_Renderer extends WebGLRenderer {
 
   List<BoneNode> bones;
 
+  DebugParticleShader debug_particle_shader;
+
   double start;
 
-  MMD_Renderer({int width: 512, int height: 512}) : super(width: width, height: height)
-  {
+  void _initialize() {
     gl.getExtension("OES_texture_float");
     gl.getExtension("OES_texture_float_linear");
 
@@ -309,40 +248,35 @@ class MMD_Renderer extends WebGLRenderer {
       "projection_matrix",
     ]);
 
-    this._initializeDebugShader();
+    this.debug_particle_shader = new DebugParticleShader(this.dom.width, this.dom.height);
 
     this.trackball.value = 1.0;
+
+    this.debug_particle_shader = new DebugParticleShader.copy(this);
 
     this._loadPMD();
     this._loadVMD();
   }
 
-  void _initializeDebugShader()
+  MMD_Renderer(int width, int height)
   {
-    var debug_vs = this.compileVertexShader(DEBUG_VS);
-    var debug_fs = this.compileFragmentShader(DEBUG_FS);
-    this.debug_program = this.linkProgram(debug_vs, debug_fs);
-    gl.deleteShader(debug_vs);
-    gl.deleteShader(debug_fs);
+    this.initContext(width, height);
+    this.initTrackball();
 
-    this.debug_attributes = this.getAttributes(this.debug_program, [
-      "position",
-      "color",
-      "point_size",
-    ]);
+    this._initialize();
+  }
 
-    this.debug_uniforms = this.getUniformLocations(this.debug_program, [
-      "mvp_matrix",
-    ]);
+  MMD_Renderer.from(WebGLRenderer src)
+  {
+    this.gl = gl;
+    this.dom = src.dom;
 
-    this.debug_color_buffer = new WebGLArrayBuffer(gl, new Float32List.fromList([]));
-    this.debug_position_buffer = new WebGLArrayBuffer(gl, new Float32List.fromList([]));
-    this.debug_poinr_size_buffer = new WebGLArrayBuffer(gl, new Float32List.fromList([]));
+    this._initialize();
   }
 
   void _loadVMD() {
     (new VMD_Animation())
-    .load("miku.vmd")
+    .load("ik.vmd")
     .then((VMD_Animation vmd) {
       this.vmd = vmd;
     });
@@ -503,7 +437,7 @@ class MMD_Renderer extends WebGLRenderer {
       if(bone.bone_type == 4) {
         v.color = new Vector4(1.0, 0.0, 0.0, 1.0);
       }
-      this.debug_vertices.add(v);
+      this.debug_particle_shader.vertices.add(v);
     });
 
     this._writeBoneTexture(bones, bone_data);
@@ -513,54 +447,8 @@ class MMD_Renderer extends WebGLRenderer {
     this.bone_texture.refresh(gl);
   }
 
-  void _renderDebug(Matrix4 mvp) {
-    bool enable_vertex = this.debug_vertices != null && this.debug_vertices.isNotEmpty;
-
-    if(enable_vertex) {
-      gl.disable(GL.DEPTH_TEST);
-      gl.useProgram(this.debug_program);
-
-      Float32List position_data = new Float32List(this.debug_vertices.length * 3);
-      Float32List color_data = new Float32List(this.debug_vertices.length * 4);
-      Float32List point_size_data = new Float32List(this.debug_vertices.length);
-      for(int i = 0; i < this.debug_vertices.length; i++) {
-        position_data.setRange(i * 3, (i + 1) * 3, this.debug_vertices[i].position.storage);
-        color_data.setRange(i * 4, (i + 1) * 4, this.debug_vertices[i].color.storage);
-        point_size_data[i] = this.debug_vertices[i].point_size;
-      }
-
-      debug_position_buffer.setData(gl, position_data);
-      debug_color_buffer.setData(gl, color_data);
-      debug_poinr_size_buffer.setData(gl, point_size_data);
-
-      if (this.debug_uniforms.containsKey("mvp_matrix")) {
-        gl.uniformMatrix4fv(this.debug_uniforms["mvp_matrix"], false, mvp.storage);
-      }
-
-      if (this.debug_attributes.containsKey("color")) {
-        gl.enableVertexAttribArray(this.debug_attributes["color"]);
-        gl.bindBuffer(GL.ARRAY_BUFFER, this.debug_color_buffer.buffer);
-        gl.vertexAttribPointer(this.debug_attributes["color"], 4, GL.FLOAT, false, 0, 0);
-      }
-
-      if (this.debug_attributes.containsKey("point_size")) {
-        gl.enableVertexAttribArray(this.debug_attributes["point_size"]);
-        gl.bindBuffer(GL.ARRAY_BUFFER, this.debug_poinr_size_buffer.buffer);
-        gl.vertexAttribPointer(this.debug_attributes["point_size"], 1, GL.FLOAT, false, 0, 0);
-      }
-
-      if (this.debug_attributes.containsKey("position")) {
-        gl.enableVertexAttribArray(this.debug_attributes["position"]);
-        gl.bindBuffer(GL.ARRAY_BUFFER, this.debug_position_buffer.buffer);
-        gl.vertexAttribPointer(this.debug_attributes["position"], 3, GL.FLOAT, false, 0, 0);
-
-        gl.drawArrays(GL.POINTS, 0, this.debug_vertices.length);
-      }
-    }
-  }
-
   void render(double elapsed) {
-    this.debug_vertices = new List<DebugVertex>();
+    this.debug_particle_shader.vertices = new List<DebugVertex>();
 
     if (this.pmd == null || this.vmd == null) {
       return;
@@ -674,6 +562,7 @@ class MMD_Renderer extends WebGLRenderer {
       gl.drawElements(GL.TRIANGLES, index_buffer.data.length, GL.UNSIGNED_SHORT, 0);
     }
 
-    this._renderDebug(mvp);
+    mvp.copyInto(this.debug_particle_shader.mvp);
+    this.debug_particle_shader.render(elapsed);
   }
 }
