@@ -218,6 +218,7 @@ class MMD_Renderer extends WebGLRenderer {
   List<BoneNode> bones;
 
   DebugParticleShader debug_particle_shader;
+  DebugAxisShader debug_axis_shader;
 
   double start;
 
@@ -253,6 +254,7 @@ class MMD_Renderer extends WebGLRenderer {
     this.trackball.value = 1.0;
 
     this.debug_particle_shader = new DebugParticleShader.copy(this);
+    this.debug_axis_shader = new DebugAxisShader.copy(this);
 
     this._loadPMD();
     this._loadVMD();
@@ -428,16 +430,19 @@ class MMD_Renderer extends WebGLRenderer {
 
     //debug output
     bones.forEach((bone){
-      var v = new DebugVertex(bone.transformed_bone_position);
+      var particle = new DebugVertex(bone.transformed_bone_position);
       if(bone.bone_type == 2) {
-        v.point_size = 5.0;
-        v.color = new Vector4(1.0, 0.0, 0.0, 1.0);
+        particle.point_size = 5.0;
+        particle.color = new Vector4(1.0, 0.0, 0.0, 1.0);
       }
 
       if(bone.bone_type == 4) {
-        v.color = new Vector4(1.0, 0.0, 0.0, 1.0);
+        particle.color = new Vector4(1.0, 0.0, 0.0, 1.0);
       }
-      this.debug_particle_shader.vertices.add(v);
+      this.debug_particle_shader.vertices.add(particle);
+
+      var axis = new DebugAxis(bone.transformed_bone_position);
+      this.debug_axis_shader.axises.add(axis);
     });
 
     this._writeBoneTexture(bones, bone_data);
@@ -449,6 +454,7 @@ class MMD_Renderer extends WebGLRenderer {
 
   void render(double elapsed) {
     this.debug_particle_shader.vertices = new List<DebugVertex>();
+    this.debug_axis_shader.axises = new List<DebugAxis>();
 
     if (this.pmd == null || this.vmd == null) {
       return;
@@ -562,7 +568,10 @@ class MMD_Renderer extends WebGLRenderer {
       gl.drawElements(GL.TRIANGLES, index_buffer.data.length, GL.UNSIGNED_SHORT, 0);
     }
 
-    mvp.copyInto(this.debug_particle_shader.mvp);
-    this.debug_particle_shader.render(elapsed);
+    //mvp.copyInto(this.debug_particle_shader.mvp);
+    //this.debug_particle_shader.render(elapsed);
+
+    mvp.copyInto(this.debug_axis_shader.mvp);
+    this.debug_axis_shader.render(elapsed);
   }
 }
