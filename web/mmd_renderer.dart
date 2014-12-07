@@ -20,11 +20,13 @@ class BoneNode {
   int bone_type = 0;
   Vector3 original_bone_position = new Vector3.zero();
   Vector3 relative_bone_position = new Vector3.zero();
-  Vector3 transformed_bone_position = new Vector3.zero();
+  Vector3 absolute_bone_position = new Vector3.zero();
 
   Vector3 position = new Vector3.zero();
   Vector3 scale = new Vector3(1.0, 1.0, 1.0);
   Quaternion rotation = new Quaternion.identity();
+  Quaternion absolute_rotation = new Quaternion.identity();
+
   Matrix4 absolute_transform = new Matrix4.identity();
   Matrix4 relative_transform = new Matrix4.identity();
 
@@ -71,11 +73,13 @@ class BoneNode {
     bone_translate_matrix.setTranslation(this.relative_bone_position);
 
     this.absolute_transform = bone_translate_matrix * translate_matrix * rotation_matrix * scale_matrix;
+    this.absolute_rotation = new Quaternion.copy(this.rotation);
     if(this.parent != null) {
       this.absolute_transform = this.parent.absolute_transform * this.absolute_transform;
+      this.absolute_rotation = this.parent.absolute_rotation * this.absolute_rotation;
     }
 
-    this.transformed_bone_position = new Vector3.copy(this.absolute_transform.getColumn(3).xyz);
+    this.absolute_bone_position = new Vector3.copy(this.absolute_transform.getColumn(3).xyz);
 
     if(recursive) {
       this.children.forEach((BoneNode bone) {
@@ -88,7 +92,7 @@ class BoneNode {
     "name : ${this.name}",
     "bone_type : ${this.bone_type}",
     "relative_bone_position : ${this.relative_bone_position}",
-    "transformed_bone_position : ${this.transformed_bone_position}",
+    "transformed_bone_position : ${this.absolute_bone_position}",
     "original_bone_position : ${this.original_bone_position}",
     "position : ${this.position}",
     "scale : ${this.scale}",
@@ -220,6 +224,7 @@ class MMD_Renderer extends WebGLRenderer {
   DebugParticleShader debug_particle_shader;
   DebugAxisShader debug_axis_shader;
 
+  int frame;
   double start;
 
   void _initialize() {
@@ -278,7 +283,7 @@ class MMD_Renderer extends WebGLRenderer {
 
   void _loadVMD() {
     (new VMD_Animation())
-    .load("ik.vmd")
+    .load("miku.vmd")
     .then((VMD_Animation vmd) {
       this.vmd = vmd;
     });
@@ -369,23 +374,24 @@ class MMD_Renderer extends WebGLRenderer {
       bone_data.setRange(offset, offset + 3, bone.original_bone_position.storage); offset += 3;
       bone_data[offset] = 1.0; offset += 1;
 
-      bone_data.setRange(offset, offset + 3, bone.transformed_bone_position.storage); offset += 3;
+      bone_data.setRange(offset, offset + 3, bone.absolute_bone_position.storage); offset += 3;
       bone_data[offset] = 1.0; offset += 1;
     }
   }
 
-  void _updaceChildIK(BoneNode child_bone, List<BoneNode> bones, PMD_IK ik) {
+  void _updateChildIK(List<BoneNode> child_bones, int child_bone_index, List<BoneNode> bones, PMD_IK ik) {
+    BoneNode child_bone = child_bones[child_bone_index];
     BoneNode ik_bone_node = bones[ik.bone_index];
     BoneNode target_bone_node = bones[ik.target_bone_index];
 
-    Vector3 target_position = target_bone_node.transformed_bone_position;
-    Vector3 ik_position = ik_bone_node.transformed_bone_position;
+    Vector3 target_position = target_bone_node.absolute_bone_position;
+    Vector3 ik_position = ik_bone_node.absolute_bone_position;
     if(target_position.distanceToSquared(ik_position) < 0.001) {
       return;
     }
 
-    Vector3 v1 = target_position - child_bone.transformed_bone_position;
-    Vector3 v2 = ik_position - child_bone.transformed_bone_position;
+    Vector3 v1 = child_bone.absolute_rotation.rotated(target_position - child_bone.absolute_bone_position);
+    Vector3 v2 = child_bone.absolute_rotation.rotated(ik_position - child_bone.absolute_bone_position);
 
     num theta = Math.acos(Math.min(Math.max(v1.dot(v2) / (v1.length * v2.length), -1.0), 1.0));
     if(theta.abs() < 0.001) {
@@ -399,12 +405,12 @@ class MMD_Renderer extends WebGLRenderer {
 
     if(child_bone.name == "左ひざ") {
       Quaternion q = new Quaternion.identity();
-      child_bone.rotation.copyFrom(q);
+      //child_bone.rotation.copyFrom(q);
     }
 
     if(child_bone.name == "右ひざ") {
       Quaternion q = new Quaternion.identity();
-      child_bone.rotation.copyFrom(q);
+      //child_bone.rotation.copyFrom(q);
     }
 
     child_bone.update();
@@ -416,7 +422,9 @@ class MMD_Renderer extends WebGLRenderer {
       BoneNode ik_bone_node = bones[ik.bone_index];
       BoneNode target_bone_node = bones[ik.target_bone_index];
 
-      child_bones.forEach((BoneNode child_bone) => this._updaceChildIK(child_bone, bones, ik));
+      for(int j = 0; j < child_bones.length; j++) {
+        this._updateChildIK(child_bones, j, bones, ik);
+      }
     }
   }
 
@@ -430,7 +438,7 @@ class MMD_Renderer extends WebGLRenderer {
 
     //debug output
     bones.forEach((bone){
-      var particle = new DebugVertex(bone.transformed_bone_position);
+      var particle = new DebugVertex(bone.absolute_bone_position);
       if(bone.bone_type == 2) {
         particle.point_size = 5.0;
         particle.color = new Vector4(1.0, 0.0, 0.0, 1.0);
@@ -440,9 +448,6 @@ class MMD_Renderer extends WebGLRenderer {
         particle.color = new Vector4(1.0, 0.0, 0.0, 1.0);
       }
       this.debug_particle_shader.vertices.add(particle);
-
-      var axis = new DebugAxis(bone.transformed_bone_position);
-      this.debug_axis_shader.axises.add(axis);
     });
 
     this._writeBoneTexture(bones, bone_data);
@@ -464,7 +469,7 @@ class MMD_Renderer extends WebGLRenderer {
       this.start = elapsed;
     }
 
-    int frame = ((elapsed - start) / 30.0).round() % 750;
+    this.frame = ((elapsed - start) / 30.0).round() % 750;
 
     Matrix4 projection = new Matrix4.identity();
     setPerspectiveMatrix(projection, Math.PI * 60.0 / 180.0, this.aspect, 0.1, 1000.0);
@@ -529,7 +534,7 @@ class MMD_Renderer extends WebGLRenderer {
       gl.vertexAttribPointer(this.attributes["bone"], 3, GL.FLOAT, false, 0, 0);
     }
 
-    this._updateBoneAnimation(this.bones, this.pmd.iks, this.vmd, frame, this.bone_texture.data);
+    this._updateBoneAnimation(this.bones, this.pmd.iks, this.vmd, this.frame, this.bone_texture.data);
     this._refreshBoneTexture();
 
     gl.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
@@ -568,10 +573,9 @@ class MMD_Renderer extends WebGLRenderer {
       gl.drawElements(GL.TRIANGLES, index_buffer.data.length, GL.UNSIGNED_SHORT, 0);
     }
 
-    //mvp.copyInto(this.debug_particle_shader.mvp);
-    //this.debug_particle_shader.render(elapsed);
-
     mvp.copyInto(this.debug_axis_shader.mvp);
     this.debug_axis_shader.render(elapsed);
+    mvp.copyInto(this.debug_particle_shader.mvp);
+    this.debug_particle_shader.render(elapsed);
   }
 }
