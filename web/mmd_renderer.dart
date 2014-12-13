@@ -224,6 +224,7 @@ class MMD_Renderer extends WebGLRenderer {
   DebugParticleShader debug_particle_shader;
   DebugAxisShader debug_axis_shader;
 
+  bool play = true;
   int frame;
   double start;
 
@@ -401,15 +402,9 @@ class MMD_Renderer extends WebGLRenderer {
     Vector3 axis = v1.cross(v2).normalize();
     Quaternion q = new Quaternion.identity();
     if(child_bone.name == "左ひざ") {
-      Vector3 leg_axis = new Vector3(1.0, 0.0, 0.0);
-      if(axis.dot(leg_axis) > 0.0) {
-        q.setAxisAngle(leg_axis, theta * ik.control_weight);
-      }
+      q.setAxisAngle(axis, theta * ik.control_weight);
     }else if(child_bone.name == "右ひざ") {
-      Vector3 leg_axis = new Vector3(1.0, 0.0, 0.0);
-      if(axis.dot(leg_axis) > 0.0) {
-        q.setAxisAngle(leg_axis, theta * ik.control_weight);
-      }
+      q.setAxisAngle(axis, theta * ik.control_weight);
     } else {
       q.setAxisAngle(axis, theta * ik.control_weight);
     }
@@ -470,9 +465,12 @@ class MMD_Renderer extends WebGLRenderer {
 
     if(this.start == null) {
       this.start = elapsed;
+      this.frame = 0;
     }
 
-    this.frame = ((elapsed - start) / 30.0).round() % 750;
+    if(this.play) {
+      this.frame = ((elapsed - start) / 30.0).round() % 750;
+    }
 
     Matrix4 projection = new Matrix4.identity();
     setPerspectiveMatrix(projection, Math.PI * 60.0 / 180.0, this.aspect, 0.1, 1000.0);

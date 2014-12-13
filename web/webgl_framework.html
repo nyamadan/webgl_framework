@@ -8,7 +8,16 @@
   </head>
   <body>
     <h1>WebGL_Framework</h1>
-
+    <input id="frame-slider" type="range" style="width: 512px" min="0" max="750" step="1" value="0" disabled/>
+    <br/>
+    <label>
+      Frame <input id="frame" type="number" value="0" min="0" max="750" step="1" disabled/>
+    </label>
+    <br/>
+    <label>
+      <input id="play" type="checkbox" checked/> Play
+    </label>
+    <br/>
     <script type="application/dart" src="webgl_framework.dart"></script>
     <script src="packages/browser/dart.js"></script>
   </body>
