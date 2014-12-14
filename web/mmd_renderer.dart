@@ -39,7 +39,7 @@ class BoneNode {
     this.rotation = new Quaternion.identity();
     this.position = new Vector3.zero();
     this.scale = new Vector3(1.0, 1.0, 1.0);
-    this.euler_angle = Math.PI * 0.5;
+    this.euler_angle = 0.0;
 
     List<VMD_BoneMotion> motions = vmd.getFrame(this.name, frame);
     if(motions != null) {
@@ -195,6 +195,7 @@ class MMD_Renderer extends WebGLRenderer {
 
   uniform vec4 diffuse;
   uniform sampler2D texture;
+  uniform sampler2D toon_texture;
 
   varying vec4 v_normal;
   varying vec2 v_coord;
@@ -203,8 +204,9 @@ class MMD_Renderer extends WebGLRenderer {
     vec4 tex_color = texture2D(texture, v_coord);
 
     float d = clamp(dot(v_normal.xyz, vec3(0.0, 0.0, 1.0)), 0.0, 1.0);
-    d = (d * d) * 0.5 + 0.5;
-    gl_FragColor = vec4(diffuse.rgb * tex_color.rgb * d, diffuse.a);
+    vec4 toon_color = texture2D(toon_texture, vec2(0.5, d));
+
+    gl_FragColor = vec4(diffuse.rgb * tex_color.rgb * toon_color.rgb, diffuse.a);
   }
   """;
 
@@ -219,6 +221,7 @@ class MMD_Renderer extends WebGLRenderer {
 
   List<WebGLElementArrayBuffer> index_buffer_list;
   Map<String, WebGLCanvasTexture> textures;
+  Map<int, WebGLCanvasTexture> toon_textures;
   WebGLCanvasTexture white_texture;
   WebGLTypedDataTexture bone_texture;
 
@@ -254,6 +257,7 @@ class MMD_Renderer extends WebGLRenderer {
     this.uniforms = this.getUniformLocations(this.program, [
       "diffuse",
       "texture",
+      "toon_texture",
       "bone_texture",
       "mvp_matrix",
       "model_matrix",
@@ -320,14 +324,19 @@ class MMD_Renderer extends WebGLRenderer {
       );
 
       this.textures = new Map<String, WebGLCanvasTexture>();
+      this.toon_textures = new Map<int, WebGLCanvasTexture>();
       pmd.materials.forEach((PMD_Material material){
-        if( material.texture_file_name.isEmpty || this.textures.containsKey(material.texture_file_name)) {
-          return;
+        if( material.texture_file_name.isNotEmpty && !this.textures.containsKey(material.texture_file_name)) {
+          var texture = new WebGLCanvasTexture(gl);
+          texture.load(gl, material.texture_file_name);
+          this.textures[material.texture_file_name] = texture;
         }
 
-        var texture = new WebGLCanvasTexture(gl);
-        texture.load(gl, material.texture_file_name);
-        this.textures[material.texture_file_name] = texture;
+        if( material.toon_index != null && material.toon_index >= 1 && !this.textures.containsKey(material.texture_file_name)) {
+          var texture = new WebGLCanvasTexture(gl, flip_y: true);
+          texture.load(gl, "toon${material.toon_index.toString().padLeft(2, '0')}.bmp");
+          this.toon_textures[material.toon_index] = texture;
+        }
       });
 
       Float32List bone_data = new Float32List(8 * 512 * 4);
@@ -392,7 +401,7 @@ class MMD_Renderer extends WebGLRenderer {
 
     Vector3 target_position = target_bone_node.absolute_bone_position;
     Vector3 ik_position = ik_bone_node.absolute_bone_position;
-    if(target_position.distanceToSquared(ik_position) < 0.001) {
+    if(target_position.distanceToSquared(ik_position) < 0.01) {
       return;
     }
 
@@ -406,18 +415,17 @@ class MMD_Renderer extends WebGLRenderer {
     if(child_bone.name == "左ひざ" || child_bone.name == "右ひざ") {
       Quaternion q = new Quaternion.identity();
       q.setAxisAngle(axis, theta);
-
       var theta_x = Math.asin(q.x) * 2.0;
-      child_bone.euler_angle += theta_x * ik.control_weight;
-      child_bone.euler_angle = Math.max(0.0, Math.min(Math.PI, child_bone.euler_angle));
-      q.setAxisAngle(new Vector3(1.0, 0.0, 0.0), child_bone.euler_angle);
-      child_bone.rotation.copyFrom(q);
+      child_bone.euler_angle = Math.max(0.0, Math.min(Math.PI, child_bone.euler_angle + theta_x * ik.control_weight));
+
+      Quaternion p = new Quaternion.identity();
+      p.setAxisAngle(new Vector3(1.0, 0.0, 0.0), child_bone.euler_angle);
+      child_bone.rotation.copyFrom(p);
     } else {
       Quaternion q = new Quaternion.identity();
       q.setAxisAngle(axis, theta * ik.control_weight);
       child_bone.rotation.copyFrom(child_bone.rotation * q);
     }
-
 
     child_bone.update();
   }
@@ -577,13 +585,25 @@ class MMD_Renderer extends WebGLRenderer {
         gl.uniform1i(this.uniforms["bone_texture"], 1);
       }
 
+      if (this.uniforms.containsKey("toon_texture")) {
+        gl.activeTexture(GL.TEXTURE2);
+        GL.Texture texture;
+        if(this.toon_textures.containsKey(material.toon_index)) {
+          texture = this.toon_textures[material.toon_index].texture;
+        } else {
+          texture = this.white_texture.texture;
+        }
+        gl.bindTexture(GL.TEXTURE_2D, texture);
+        gl.uniform1i(this.uniforms["toon_texture"], 2);
+      }
+
       gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, index_buffer.buffer);
       gl.drawElements(GL.TRIANGLES, index_buffer.data.length, GL.UNSIGNED_SHORT, 0);
     }
 
-    mvp.copyInto(this.debug_axis_shader.mvp);
-    this.debug_axis_shader.render(elapsed);
-    mvp.copyInto(this.debug_particle_shader.mvp);
-    this.debug_particle_shader.render(elapsed);
+    //mvp.copyInto(this.debug_axis_shader.mvp);
+    //this.debug_axis_shader.render(elapsed);
+    //mvp.copyInto(this.debug_particle_shader.mvp);
+    //this.debug_particle_shader.render(elapsed);
   }
 }
