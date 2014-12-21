@@ -801,7 +801,6 @@ class PMX_Model {
     this.bones = new List<PMX_Bone>.generate(length, (int i){
       PMX_Bone bone = new PMX_Bone();
       offset = bone.parse(buffer, view, offset, this.encoding, this.bone_index_size);
-      print(bone);
       return bone;
     });
 
@@ -819,7 +818,6 @@ class PMX_Model {
     offset = this._getTextures(buffer, view, offset);
     offset = this._getMaterials(buffer, view, offset);
     offset = this._getBones(buffer, view, offset);
-    log.shout(this.bones);
   }
 
   String toString() => ["{", [
