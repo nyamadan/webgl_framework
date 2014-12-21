@@ -15,6 +15,7 @@ import "sjis_to_string.dart";
 part 'pmd_parser.dart';
 part 'vmd_parser.dart';
 part 'main_shader.dart';
+part 'edge_shader.dart';
 
 class BoneNode {
   String name;
@@ -132,6 +133,7 @@ class MMD_Renderer extends WebGLRenderer {
   DebugParticleShader debug_particle_shader;
   DebugAxisShader debug_axis_shader;
   MainShader main_shader;
+  EdgeShader edge_shader;
 
   bool play = true;
   int frame;
@@ -149,6 +151,7 @@ class MMD_Renderer extends WebGLRenderer {
     this.debug_axis_shader = new DebugAxisShader.copy(this);
 
     this.main_shader = new MainShader.copy(this);
+    this.edge_shader = new EdgeShader.copy(this);
 
     this._loadPMD();
     this._loadVMD();
@@ -378,7 +381,22 @@ class MMD_Renderer extends WebGLRenderer {
     this.bone_texture.refresh(gl);
 
     //setup shader
-    this.main_shader.pmd = this.pmd;
+    gl.clearColor(0.5, 0.5, 0.5, 1.0);
+    gl.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
+
+    this.edge_shader.position_buffer = this.position_buffer;
+    this.edge_shader.normal_buffer = this.normal_buffer;
+    this.edge_shader.bone_buffer = this.bone_buffer;
+    this.edge_shader.index_buffer_list = this.index_buffer_list;
+    this.edge_shader.bone_texture = this.bone_texture;
+
+    this.edge_shader.model = model;
+    this.edge_shader.view = view;
+    this.edge_shader.projection = projection;
+    this.edge_shader.mvp = mvp;
+    this.edge_shader.render(elapsed);
+
+    this.main_shader.materials = this.pmd.materials;
     this.main_shader.position_buffer = this.position_buffer;
     this.main_shader.normal_buffer = this.normal_buffer;
     this.main_shader.coord_buffer = this.coord_buffer;
@@ -392,7 +410,6 @@ class MMD_Renderer extends WebGLRenderer {
     this.main_shader.view = view;
     this.main_shader.projection = projection;
     this.main_shader.mvp = mvp;
-
     this.main_shader.render(elapsed);
 
     //mvp.copyInto(this.debug_axis_shader.mvp);
