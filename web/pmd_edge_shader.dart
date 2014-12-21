@@ -1,6 +1,6 @@
 part of mmd_renderer;
 
-class EdgeShader extends WebGLRenderer {
+class PMD_EdgeShader extends WebGLRenderer {
   static const String VS =
   """
   attribute vec3 position;
@@ -105,13 +105,13 @@ class EdgeShader extends WebGLRenderer {
   Matrix4 projection;
   Matrix4 mvp;
 
-  EdgeShader(int width, int height)
+  PMD_EdgeShader(int width, int height)
   {
     this.initContext(width, height);
     this._initialize();
   }
 
-  EdgeShader.copy(WebGLRenderer src) {
+  PMD_EdgeShader.copy(WebGLRenderer src) {
     this.gl = src.gl;
     this.dom = src.dom;
     this._initialize();

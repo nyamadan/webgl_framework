@@ -16,8 +16,8 @@ import "sjis_to_string.dart";
 part 'pmd_parser.dart';
 part 'pmx_parser.dart';
 part 'vmd_parser.dart';
-part 'main_shader.dart';
-part 'edge_shader.dart';
+part 'pmd_main_shader.dart';
+part 'pmd_edge_shader.dart';
 
 class BoneNode {
   String name;
@@ -135,8 +135,8 @@ class MMD_Renderer extends WebGLRenderer {
 
   DebugParticleShader debug_particle_shader;
   DebugAxisShader debug_axis_shader;
-  MainShader main_shader;
-  EdgeShader edge_shader;
+  PMD_MainShader main_shader;
+  PMD_EdgeShader edge_shader;
 
   bool play = true;
   int frame;
@@ -153,8 +153,8 @@ class MMD_Renderer extends WebGLRenderer {
     this.debug_particle_shader = new DebugParticleShader.copy(this);
     this.debug_axis_shader = new DebugAxisShader.copy(this);
 
-    this.main_shader = new MainShader.copy(this);
-    this.edge_shader = new EdgeShader.copy(this);
+    this.main_shader = new PMD_MainShader.copy(this);
+    this.edge_shader = new PMD_EdgeShader.copy(this);
 
     this._loadPMD();
     this._loadVMD();

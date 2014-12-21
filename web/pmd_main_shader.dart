@@ -1,6 +1,6 @@
 part of mmd_renderer;
 
-class MainShader extends WebGLRenderer {
+class PMD_MainShader extends WebGLRenderer {
   static const String VS =
   """
   attribute vec3 position;
@@ -120,13 +120,13 @@ class MainShader extends WebGLRenderer {
   Matrix4 projection;
   Matrix4 mvp;
 
-  MainShader(int width, int height)
+  PMD_MainShader(int width, int height)
   {
     this.initContext(width, height);
     this._initialize();
   }
 
-  MainShader.copy(WebGLRenderer src) {
+  PMD_MainShader.copy(WebGLRenderer src) {
     this.gl = src.gl;
     this.dom = src.dom;
     this._initialize();
