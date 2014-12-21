@@ -376,6 +376,18 @@ class PMD_Model {
     return normal_list;
   }
 
+  Float32List createEdgeList() {
+    Float32List edge_list = new Float32List(this.vertices.length);
+    for(int i = 0; i < this.vertices.length; i++) {
+      if(this.vertices[i].edge_flag > 0) {
+        edge_list[i] = 0.05;
+      } else {
+        edge_list[i] = 0.0;
+      }
+    }
+    return edge_list;
+  }
+
   Float32List createBoneList() {
     Float32List bone_list = new Float32List(this.vertices.length * 3);
     for(int i = 0; i < this.vertices.length; i++) {

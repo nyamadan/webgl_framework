@@ -6,6 +6,7 @@ class EdgeShader extends WebGLRenderer {
   attribute vec3 position;
   attribute vec3 normal;
   attribute vec3 bone;
+  attribute float edge;
   uniform mat4 model_matrix;
   uniform mat4 view_matrix;
   uniform mat4 projection_matrix;
@@ -72,7 +73,7 @@ class EdgeShader extends WebGLRenderer {
     v_normal = vec4(normalize(mat3(model_matrix * m) * normal), 1.0);
 
     vec4 p = mix(p2, p1, weight);
-    p.xyz += v_normal.xyz * 0.05;
+    p.xyz += v_normal.xyz * edge;
     gl_Position = projection_matrix * view_matrix * model_matrix * p;
   }
   """;
@@ -88,6 +89,7 @@ class EdgeShader extends WebGLRenderer {
   """;
 
   WebGLArrayBuffer position_buffer;
+  WebGLArrayBuffer edge_buffer;
   WebGLArrayBuffer normal_buffer;
   WebGLArrayBuffer bone_buffer;
 
@@ -126,6 +128,7 @@ class EdgeShader extends WebGLRenderer {
       "position",
       "normal",
       "bone",
+      "edge",
     ]);
 
     this.uniforms = this.getUniformLocations(this.program, [
@@ -141,6 +144,7 @@ class EdgeShader extends WebGLRenderer {
   {
     gl.enable(GL.DEPTH_TEST);
     gl.depthFunc(GL.LEQUAL);
+    gl.depthMask(false);
 
     gl.enable(GL.CULL_FACE);
     gl.frontFace(GL.CW);
@@ -167,6 +171,12 @@ class EdgeShader extends WebGLRenderer {
       gl.enableVertexAttribArray(this.attributes["normal"]);
       gl.bindBuffer(GL.ARRAY_BUFFER, this.normal_buffer.buffer);
       gl.vertexAttribPointer(this.attributes["normal"], 3, GL.FLOAT, false, 0, 0);
+    }
+
+    if (this.attributes.containsKey("edge")) {
+      gl.enableVertexAttribArray(this.attributes["edge"]);
+      gl.bindBuffer(GL.ARRAY_BUFFER, this.edge_buffer.buffer);
+      gl.vertexAttribPointer(this.attributes["edge"], 1, GL.FLOAT, false, 0, 0);
     }
 
     if (this.attributes.containsKey("position")) {

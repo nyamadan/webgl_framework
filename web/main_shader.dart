@@ -162,9 +162,9 @@ class MainShader extends WebGLRenderer {
   {
     gl.enable(GL.DEPTH_TEST);
     gl.depthFunc(GL.LEQUAL);
+    gl.depthMask(true);
 
-    gl.enable(GL.CULL_FACE);
-    gl.frontFace(GL.CCW);
+    gl.disable(GL.CULL_FACE);
 
     gl.useProgram(this.program);
 

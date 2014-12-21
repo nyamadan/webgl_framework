@@ -118,6 +118,7 @@ class MMD_Renderer extends WebGLRenderer {
   WebGLArrayBuffer normal_buffer;
   WebGLArrayBuffer coord_buffer;
   WebGLArrayBuffer bone_buffer;
+  WebGLArrayBuffer edge_buffer;
 
   List<WebGLElementArrayBuffer> index_buffer_list;
   Map<String, WebGLCanvasTexture> textures;
@@ -189,8 +190,10 @@ class MMD_Renderer extends WebGLRenderer {
       var normal_list = pmd.createNormalList();
       var coord_list = pmd.createCoordList();
       var bone_buffer = pmd.createBoneList();
+      var edge_buffer = pmd.createEdgeList();
 
       this.position_buffer = new WebGLArrayBuffer(gl, position_list);
+      this.edge_buffer = new WebGLArrayBuffer(gl, edge_buffer);
       this.normal_buffer = new WebGLArrayBuffer(gl, normal_list);
       this.coord_buffer = new WebGLArrayBuffer(gl, coord_list);
       this.bone_buffer = new WebGLArrayBuffer(gl, bone_buffer);
@@ -385,6 +388,7 @@ class MMD_Renderer extends WebGLRenderer {
     gl.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
 
     this.edge_shader.position_buffer = this.position_buffer;
+    this.edge_shader.edge_buffer = this.edge_buffer;
     this.edge_shader.normal_buffer = this.normal_buffer;
     this.edge_shader.bone_buffer = this.bone_buffer;
     this.edge_shader.index_buffer_list = this.index_buffer_list;
