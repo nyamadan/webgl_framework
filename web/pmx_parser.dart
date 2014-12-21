@@ -6,6 +6,237 @@ class PMX_Exception implements Exception {
   String toString() => "PMX_Exception\n${this.message}";
 }
 
+class PMX_IK {
+  int bone_index;
+  Vector3 min;
+  Vector3 max;
+
+  int _getInt(ByteBuffer buffer, ByteData view, int offset, int size) {
+    if(size == 1) {
+      return view.getInt8(offset);
+    }
+    if(size == 2) {
+      return view.getInt16(offset, Endianness.LITTLE_ENDIAN);
+    }
+    if(size == 4) {
+      return view.getInt32(offset, Endianness.LITTLE_ENDIAN);
+    }
+    return null;
+  }
+
+  int parse(ByteBuffer buffer, ByteData view, int offset, int bone_index_size) {
+    this.bone_index = this._getInt(buffer, view, offset, bone_index_size);
+    offset += bone_index_size;
+
+    int rotation_limit = view.getUint8(offset);
+    offset += 1;
+
+    if(rotation_limit != 0) {
+      this.min = new Vector3.zero();
+      this.min.x = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+      offset += 4;
+      this.min.y = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+      offset += 4;
+      this.min.z = -view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+      offset += 4;
+
+      this.max = new Vector3.zero();
+      this.max.x = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+      offset += 4;
+      this.max.y = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+      offset += 4;
+      this.max.z = -view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+      offset += 4;
+    }
+
+    return offset;
+  }
+
+  String toString() => ["{", [
+    "bone_index: ${this.bone_index}",
+    "min: ${this.min}",
+    "max: ${this.max}",
+  ].join(", "), "}"].join("");
+}
+
+class PMX_Bone {
+  String name;
+  String english_name;
+  Vector3 bone_head_pos;
+  int parent_bone_index;
+  int depth;
+  int flag;
+  int tail_bone_index;
+  Vector3 tail_bone_pos;
+
+  int parent_transform_bone_index;
+  double transform_weight;
+
+  Vector3 axis;
+  Vector3 local_axis_x;
+  Vector3 local_axis_z;
+
+  int another_parent_key;
+
+  int ik_target_bone_index;
+  int iterations;
+  double control_weight;
+  List<PMX_IK> iks;
+
+  String _getText(ByteBuffer buffer, ByteData view, int offset, int length, int encoding) {
+    if(encoding == 0) {
+      int word_length = length ~/ 2;
+      List<int> name_buffer = new List<int>.generate(word_length, (int i) => view.getUint16(offset + 2 * i, Endianness.LITTLE_ENDIAN));
+      return new String.fromCharCodes(name_buffer);
+    } else if(encoding == 1) {
+      return null;
+    }
+
+    return null;
+  }
+
+  int _getInt(ByteBuffer buffer, ByteData view, int offset, int size) {
+    if(size == 1) {
+      return view.getInt8(offset);
+    }
+    if(size == 2) {
+      return view.getInt16(offset, Endianness.LITTLE_ENDIAN);
+    }
+    if(size == 4) {
+      return view.getInt32(offset, Endianness.LITTLE_ENDIAN);
+    }
+    return null;
+  }
+
+  int parse(ByteBuffer buffer, ByteData view, int offset, int encoding, int bone_index_size) {
+    int name_length = view.getUint32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+
+    this.name = this._getText(buffer, view, offset, name_length, encoding);
+    offset += name_length;
+
+    int english_name_length = view.getUint32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+
+    this.english_name = this._getText(buffer, view, offset, english_name_length, encoding);
+    offset += english_name_length;
+
+    this.bone_head_pos = new Vector3.zero();
+    this.bone_head_pos.x = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+    this.bone_head_pos.y = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+    this.bone_head_pos.z = -view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+
+    this.parent_bone_index = this._getInt(buffer, view, offset, bone_index_size);
+    offset += bone_index_size;
+
+    this.depth = view.getInt32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+
+    this.flag = view.getUint16(offset, Endianness.LITTLE_ENDIAN);
+    offset += 2;
+
+    if(this.flag & 0x0001 == 0) {
+      this.tail_bone_pos = new Vector3.zero();
+      this.tail_bone_pos.x = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+      offset += 4;
+      this.tail_bone_pos.y = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+      offset += 4;
+      this.tail_bone_pos.z = -view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+      offset += 4;
+    } else {
+      this.tail_bone_index = this._getInt(buffer, view, offset, bone_index_size);
+      offset += bone_index_size;
+    }
+
+    if(this.flag & 0x0300 != 0) {
+      this.parent_transform_bone_index = this._getInt(buffer, view, offset, bone_index_size);
+      offset += bone_index_size;
+
+      this.transform_weight = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+      offset += 4;
+    }
+
+    if(this.flag & 0x0400 != 0) {
+      this.axis = new Vector3.zero();
+      this.axis.x = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+      offset += 4;
+      this.axis.y = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+      offset += 4;
+      this.axis.z = -view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+      offset += 4;
+    }
+
+    if(this.flag & 0x0800 != 0) {
+      this.local_axis_x = new Vector3.zero();
+      this.local_axis_x.x = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+      offset += 4;
+      this.local_axis_x.y = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+      offset += 4;
+      this.local_axis_x.z = -view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+      offset += 4;
+
+      this.local_axis_z = new Vector3.zero();
+      this.local_axis_z.x = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+      offset += 4;
+      this.local_axis_z.y = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+      offset += 4;
+      this.local_axis_z.z = -view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+      offset += 4;
+    }
+
+    if(this.flag & 0x2000 != 0) {
+      this.another_parent_key = view.getInt32(offset, Endianness.LITTLE_ENDIAN);
+      offset += 4;
+    }
+
+    if(this.flag & 0x0020 != 0) {
+      this.ik_target_bone_index = this._getInt(buffer, view, offset, bone_index_size);
+      offset += bone_index_size;
+
+      this.iterations = view.getUint32(offset, Endianness.LITTLE_ENDIAN);
+      offset += 4;
+
+      this.control_weight = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+      offset += 4;
+
+      int length = view.getUint32(offset, Endianness.LITTLE_ENDIAN);
+      offset += 4;
+
+      this.iks = new List<PMX_IK>.generate(length, (int i){
+        PMX_IK ik = new PMX_IK();
+        offset = ik.parse(buffer, view, offset, bone_index_size);
+        return ik;
+      });
+    }
+
+    return offset;
+  }
+
+  String toString() => ["{", [
+    "name: ${this.name}",
+    "english_name: ${this.english_name}",
+    "bone_head_pos: ${this.bone_head_pos}",
+    "parent_bone_index: ${this.parent_bone_index}",
+    "depth: ${this.depth}",
+    "flag: ${this.flag}",
+    "tail_bone_index: ${this.tail_bone_index}",
+    "tail_bone_pos: ${this.tail_bone_pos}",
+    "parent_transform_bone_index: ${this.parent_transform_bone_index}",
+    "transform_weight: ${this.transform_weight}",
+    "axis: ${this.axis}",
+    "local_axis_x: ${this.local_axis_x}",
+    "local_axis_z: ${this.local_axis_z}",
+    "another_parent_key: ${this.another_parent_key}",
+    "ik_target_bone_index: ${this.ik_target_bone_index}",
+    "iterations: ${this.iterations}",
+    "control_weight: ${this.control_weight}",
+    "iks: ${this.iks != null ? '...' : null}",
+  ].join(", "), "}"].join("");
+}
+
 class PMX_Vertex {
   Vector3 position;
   Vector3 normal;
@@ -282,11 +513,11 @@ class PMX_Material {
     int bit_flag = view.getUint8(offset);
     offset += 1;
 
-    this.cull_face = (bit_flag & 0x01 > 0) ? false : true;
-    this.drop_shadow = (bit_flag & 0x02 > 0) ? true : false;
-    this.drop_self_shadow = (bit_flag & 0x04 > 0) ? true : false;
-    this.draw_self_shadow = (bit_flag & 0x08 > 0) ? true : false;
-    this.edge = (bit_flag & 0x10 > 0) ? true : false;
+    this.cull_face = (bit_flag & 0x01 != 0) ? false : true;
+    this.drop_shadow = (bit_flag & 0x02 != 0) ? true : false;
+    this.drop_self_shadow = (bit_flag & 0x04 != 0) ? true : false;
+    this.draw_self_shadow = (bit_flag & 0x08 != 0) ? true : false;
+    this.edge = (bit_flag & 0x10 != 0) ? true : false;
 
     this.edge_color = new Vector4.zero();
     this.edge_color.r = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
@@ -381,6 +612,7 @@ class PMX_Model {
   List<int> triangles;
   List<String> textures;
   List<PMX_Material> materials;
+  List<PMX_Bone> bones;
 
   Future<PMX_Model> load(String uri) {
     var completer = new Completer<PMX_Model>();
@@ -562,6 +794,20 @@ class PMX_Model {
     return offset;
   }
 
+  int _getBones(ByteBuffer buffer, ByteData view, int offset) {
+    int length = view.getUint32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+
+    this.bones = new List<PMX_Bone>.generate(length, (int i){
+      PMX_Bone bone = new PMX_Bone();
+      offset = bone.parse(buffer, view, offset, this.encoding, this.bone_index_size);
+      print(bone);
+      return bone;
+    });
+
+    return offset;
+  }
+
   void parse(ByteBuffer buffer) {
     var view = new ByteData.view(buffer);
     int offset = 0;
@@ -572,7 +818,8 @@ class PMX_Model {
     offset = this._getTriangles(buffer, view, offset);
     offset = this._getTextures(buffer, view, offset);
     offset = this._getMaterials(buffer, view, offset);
-    log.info(this.materials);
+    offset = this._getBones(buffer, view, offset);
+    log.shout(this.bones);
   }
 
   String toString() => ["{", [
@@ -594,5 +841,6 @@ class PMX_Model {
     "vertices: ${this.vertices != null ? "..." : null}",
     "textures: ${this.textures != null ? "..." : null}",
     "materials: ${this.materials != null ? "..." : null}",
+    "bones: ${this.bones != null ? "..." : null}",
   ].join(", "), "}"].join("");
 }

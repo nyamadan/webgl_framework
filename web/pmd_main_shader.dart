@@ -100,12 +100,12 @@ class PMD_MainShader extends WebGLRenderer {
   """;
 
   List<PMD_Material> materials;
-  WebGLArrayBuffer position_buffer;
-  WebGLArrayBuffer normal_buffer;
-  WebGLArrayBuffer coord_buffer;
-  WebGLArrayBuffer bone_buffer;
+  WebGLArrayBuffer32 position_buffer;
+  WebGLArrayBuffer32 normal_buffer;
+  WebGLArrayBuffer32 coord_buffer;
+  WebGLArrayBuffer32 bone_buffer;
 
-  List<WebGLElementArrayBuffer> index_buffer_list;
+  List<WebGLElementArrayBuffer16> index_buffer_list;
   Map<String, WebGLCanvasTexture> textures;
   Map<int, WebGLCanvasTexture> toon_textures;
   WebGLCanvasTexture white_texture;

@@ -3,7 +3,6 @@ library mmd_renderer;
 import 'dart:html';
 import 'dart:typed_data';
 import 'dart:async';
-import 'dart:convert';
 import 'dart:math' as Math;
 import 'dart:web_gl' as GL;
 
@@ -116,13 +115,14 @@ class BoneNode {
 class MMD_Renderer extends WebGLRenderer {
   final Logger log = new Logger("MMD_Renderer");
 
-  WebGLArrayBuffer position_buffer;
-  WebGLArrayBuffer normal_buffer;
-  WebGLArrayBuffer coord_buffer;
-  WebGLArrayBuffer bone_buffer;
-  WebGLArrayBuffer edge_buffer;
+  WebGLArrayBuffer32 position_buffer;
+  WebGLArrayBuffer32 normal_buffer;
+  WebGLArrayBuffer32 coord_buffer;
+  WebGLArrayBuffer32 bone_buffer;
+  WebGLArrayBuffer32 edge_buffer;
 
-  List<WebGLElementArrayBuffer> index_buffer_list;
+  List<WebGLElementArrayBuffer16> index_buffer_list16;
+
   Map<String, WebGLCanvasTexture> textures;
   Map<int, WebGLCanvasTexture> toon_textures;
   WebGLCanvasTexture white_texture;
@@ -194,14 +194,14 @@ class MMD_Renderer extends WebGLRenderer {
       var bone_buffer = pmd.createBoneList();
       var edge_buffer = pmd.createEdgeList();
 
-      this.position_buffer = new WebGLArrayBuffer(gl, position_list);
-      this.edge_buffer = new WebGLArrayBuffer(gl, edge_buffer);
-      this.normal_buffer = new WebGLArrayBuffer(gl, normal_list);
-      this.coord_buffer = new WebGLArrayBuffer(gl, coord_list);
-      this.bone_buffer = new WebGLArrayBuffer(gl, bone_buffer);
+      this.position_buffer = new WebGLArrayBuffer32(gl, position_list);
+      this.edge_buffer = new WebGLArrayBuffer32(gl, edge_buffer);
+      this.normal_buffer = new WebGLArrayBuffer32(gl, normal_list);
+      this.coord_buffer = new WebGLArrayBuffer32(gl, coord_list);
+      this.bone_buffer = new WebGLArrayBuffer32(gl, bone_buffer);
 
-      this.index_buffer_list = new List<WebGLElementArrayBuffer>.generate(pmd.materials.length,
-        (int i) => new WebGLElementArrayBuffer(gl, pmd.createTriangleList(i))
+      this.index_buffer_list16 = new List<WebGLElementArrayBuffer16>.generate(pmd.materials.length,
+        (int i) => new WebGLElementArrayBuffer16(gl, pmd.createTriangleList(i))
       );
 
       this.white_texture = new WebGLCanvasTexture(gl,
@@ -393,7 +393,7 @@ class MMD_Renderer extends WebGLRenderer {
     this.edge_shader.edge_buffer = this.edge_buffer;
     this.edge_shader.normal_buffer = this.normal_buffer;
     this.edge_shader.bone_buffer = this.bone_buffer;
-    this.edge_shader.index_buffer_list = this.index_buffer_list;
+    this.edge_shader.index_buffer_list = this.index_buffer_list16;
     this.edge_shader.bone_texture = this.bone_texture;
 
     this.edge_shader.model = model;
@@ -407,7 +407,7 @@ class MMD_Renderer extends WebGLRenderer {
     this.main_shader.normal_buffer = this.normal_buffer;
     this.main_shader.coord_buffer = this.coord_buffer;
     this.main_shader.bone_buffer = this.bone_buffer;
-    this.main_shader.index_buffer_list = this.index_buffer_list;
+    this.main_shader.index_buffer_list = this.index_buffer_list16;
     this.main_shader.textures = this.textures;
     this.main_shader.toon_textures = this.toon_textures;
     this.main_shader.white_texture = this.white_texture;
