@@ -14,6 +14,7 @@ import "sjis_to_string.dart";
 
 part 'pmd_parser.dart';
 part 'vmd_parser.dart';
+part 'main_shader.dart';
 
 class BoneNode {
   String name;
@@ -112,108 +113,6 @@ class BoneNode {
 class MMD_Renderer extends WebGLRenderer {
   final Logger log = new Logger("MMD_Renderer");
 
-  static const String VS =
-  """
-  attribute vec3 position;
-  attribute vec3 normal;
-  attribute vec3 bone;
-  attribute vec2 coord;
-  uniform mat4 model_matrix;
-  uniform mat4 view_matrix;
-  uniform mat4 projection_matrix;
-
-  uniform sampler2D bone_texture;
-
-  varying vec4 v_normal;
-  varying vec2 v_coord;
-
-  const vec2 half_bone = vec2(0.5 / 8.0, 0.5 / 512.0);
-
-  mat4 getTransformMatrix(float bone_index) {
-    return mat4(
-      texture2D(bone_texture, vec2(
-          0.0 * half_bone.x + half_bone.x,
-          2.0 * bone_index * half_bone.y + half_bone.y
-      )),
-      texture2D(bone_texture, vec2(
-          2.0 * half_bone.x + half_bone.x,
-          2.0 * bone_index * half_bone.y + half_bone.y
-      )),
-      texture2D(bone_texture, vec2(
-          4.0 * half_bone.x + half_bone.x,
-          2.0 * bone_index * half_bone.y + half_bone.y
-      )),
-      texture2D(bone_texture, vec2(
-          6.0 * half_bone.x + half_bone.x,
-          2.0 * bone_index * half_bone.y + half_bone.y
-      ))
-    );
-  }
-
-  vec4 getBonePosition(float bone_index) {
-    return texture2D(bone_texture, vec2(
-        8.0 * half_bone.x + half_bone.x,
-        2.0 * bone_index * half_bone.y + half_bone.y
-    ));
-  }
-
-  vec4 getTransformedBonePosition(float bone_index) {
-    return texture2D(bone_texture, vec2(
-        10.0 * half_bone.x + half_bone.x,
-        2.0 * bone_index * half_bone.y + half_bone.y
-    ));
-  }
-
-  void main(void){
-    float weight = bone.z;
-    mat4 transform1 = getTransformMatrix(bone.x);
-    mat4 transform2 = getTransformMatrix(bone.y);
-
-    vec4 bone1 = getBonePosition(bone.x);
-    vec4 bone2 = getBonePosition(bone.y);
-
-    vec4 transformed_bone1 = getTransformedBonePosition(bone.x);
-    vec4 transformed_bone2 = getTransformedBonePosition(bone.y);
-
-    vec4 v1 = vec4(position, 1.0) - bone1;
-    vec4 v2 = vec4(position, 1.0) - bone2;
-
-    vec4 p1 = (transform1 * v1) + transformed_bone1;
-    vec4 p2 = (transform2 * v2) + transformed_bone2;
-
-    mat4 m = transform1 * weight + transform2 * (1.0 - weight);
-    v_normal = vec4(normalize(mat3(model_matrix * m) * normal), 1.0);
-
-    v_coord = coord;
-    gl_Position = projection_matrix * view_matrix * model_matrix * mix(p2, p1, weight);
-  }
-  """;
-
-  static const String FS =
-  """
-  precision mediump float;
-
-  uniform vec4 diffuse;
-  uniform sampler2D texture;
-  uniform sampler2D toon_texture;
-
-  varying vec4 v_normal;
-  varying vec2 v_coord;
-
-  void main(void){
-    vec4 tex_color = texture2D(texture, v_coord);
-
-    float d = clamp(dot(v_normal.xyz, vec3(0.0, 0.0, 1.0)), 0.0, 1.0);
-    vec4 toon_color = texture2D(toon_texture, vec2(0.5, d));
-
-    gl_FragColor = vec4(diffuse.rgb * tex_color.rgb * toon_color.rgb, diffuse.a);
-  }
-  """;
-
-  GL.Program program;
-  Map<String, int> attributes;
-  Map<String, GL.UniformLocation> uniforms;
-
   WebGLArrayBuffer position_buffer;
   WebGLArrayBuffer normal_buffer;
   WebGLArrayBuffer coord_buffer;
@@ -232,6 +131,7 @@ class MMD_Renderer extends WebGLRenderer {
 
   DebugParticleShader debug_particle_shader;
   DebugAxisShader debug_axis_shader;
+  MainShader main_shader;
 
   bool play = true;
   int frame;
@@ -241,36 +141,14 @@ class MMD_Renderer extends WebGLRenderer {
     gl.getExtension("OES_texture_float");
     gl.getExtension("OES_texture_float_linear");
 
-    var vs = this.compileVertexShader(VS);
-    var fs = this.compileFragmentShader(FS);
-    this.program = this.linkProgram(vs, fs);
-    gl.deleteShader(vs);
-    gl.deleteShader(fs);
-
-    this.attributes = this.getAttributes(this.program, [
-      "position",
-      "normal",
-      "coord",
-      "bone",
-    ]);
-
-    this.uniforms = this.getUniformLocations(this.program, [
-      "diffuse",
-      "texture",
-      "toon_texture",
-      "bone_texture",
-      "mvp_matrix",
-      "model_matrix",
-      "view_matrix",
-      "projection_matrix",
-    ]);
-
     this.debug_particle_shader = new DebugParticleShader(this.dom.width, this.dom.height);
 
     this.trackball.value = 1.0;
 
     this.debug_particle_shader = new DebugParticleShader.copy(this);
     this.debug_axis_shader = new DebugAxisShader.copy(this);
+
+    this.main_shader = new MainShader.copy(this);
 
     this._loadPMD();
     this._loadVMD();
@@ -466,10 +344,6 @@ class MMD_Renderer extends WebGLRenderer {
     this._writeBoneTexture(bones, bone_data);
   }
 
-  void _refreshBoneTexture() {
-    this.bone_texture.refresh(gl);
-  }
-
   void render(double elapsed) {
     this.debug_particle_shader.vertices = new List<DebugVertex>();
     this.debug_axis_shader.axises = new List<DebugAxis>();
@@ -500,106 +374,26 @@ class MMD_Renderer extends WebGLRenderer {
     Matrix4 model = rot;
     Matrix4 mvp = projection * view * model;
 
-    gl.enable(GL.DEPTH_TEST);
-    gl.depthFunc(GL.LEQUAL);
-
-    gl.enable(GL.CULL_FACE);
-    gl.frontFace(GL.CCW);
-
-    gl.clearColor(0.5, 0.5, 0.5, 1.0);
-
-    gl.useProgram(this.program);
-
-    if (this.uniforms.containsKey("mvp_matrix")) {
-      gl.uniformMatrix4fv(this.uniforms["mvp_matrix"], false, mvp.storage);
-    }
-
-    if (this.uniforms.containsKey("model_matrix")) {
-      gl.uniformMatrix4fv(this.uniforms["model_matrix"], false, model.storage);
-    }
-
-    if (this.uniforms.containsKey("view_matrix")) {
-      gl.uniformMatrix4fv(this.uniforms["view_matrix"], false, view.storage);
-    }
-
-    if (this.uniforms.containsKey("projection_matrix")) {
-      gl.uniformMatrix4fv(this.uniforms["projection_matrix"], false, projection.storage);
-    }
-
-    if (this.attributes.containsKey("normal")) {
-      gl.enableVertexAttribArray(this.attributes["normal"]);
-      gl.bindBuffer(GL.ARRAY_BUFFER, this.normal_buffer.buffer);
-      gl.vertexAttribPointer(this.attributes["normal"], 3, GL.FLOAT, false, 0, 0);
-    }
-
-    if (this.attributes.containsKey("position")) {
-      gl.enableVertexAttribArray(this.attributes["position"]);
-      gl.bindBuffer(GL.ARRAY_BUFFER, this.position_buffer.buffer);
-      gl.vertexAttribPointer(this.attributes["position"], 3, GL.FLOAT, false, 0, 0);
-    }
-
-    if (this.attributes.containsKey("coord")) {
-      gl.enableVertexAttribArray(this.attributes["coord"]);
-      gl.bindBuffer(GL.ARRAY_BUFFER, this.coord_buffer.buffer);
-      gl.vertexAttribPointer(this.attributes["coord"], 2, GL.FLOAT, false, 0, 0);
-    }
-
-    if (this.attributes.containsKey("bone")) {
-      gl.enableVertexAttribArray(this.attributes["bone"]);
-      gl.bindBuffer(GL.ARRAY_BUFFER, this.bone_buffer.buffer);
-      gl.vertexAttribPointer(this.attributes["bone"], 3, GL.FLOAT, false, 0, 0);
-    }
-
     this._updateBoneAnimation(this.bones, this.pmd.iks, this.vmd, this.frame, this.bone_texture.data);
-    this._refreshBoneTexture();
+    this.bone_texture.refresh(gl);
 
-    gl.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
+    //setup shader
+    this.main_shader.pmd = this.pmd;
+    this.main_shader.position_buffer = this.position_buffer;
+    this.main_shader.normal_buffer = this.normal_buffer;
+    this.main_shader.coord_buffer = this.coord_buffer;
+    this.main_shader.bone_buffer = this.bone_buffer;
+    this.main_shader.index_buffer_list = this.index_buffer_list;
+    this.main_shader.textures = this.textures;
+    this.main_shader.toon_textures = this.toon_textures;
+    this.main_shader.white_texture = this.white_texture;
+    this.main_shader.bone_texture = this.bone_texture;
+    this.main_shader.model = model;
+    this.main_shader.view = view;
+    this.main_shader.projection = projection;
+    this.main_shader.mvp = mvp;
 
-    for (int i = 0; i < this.pmd.materials.length; i++) {
-      var index_buffer = this.index_buffer_list[i];
-
-      var material = this.pmd.materials[i];
-
-      if (this.uniforms.containsKey("diffuse")) {
-        var color = new Vector4.zero();
-        color.rgb = material.diffuse;
-        color.a = material.alpha;
-        gl.uniform4fv(this.uniforms["diffuse"], color.storage);
-      }
-
-      if (this.uniforms.containsKey("texture")) {
-        gl.activeTexture(GL.TEXTURE0);
-        GL.Texture texture;
-        if(this.textures.containsKey(material.texture_file_name)) {
-          texture = this.textures[material.texture_file_name].texture;
-        } else {
-          texture = this.white_texture.texture;
-        }
-        gl.bindTexture(GL.TEXTURE_2D, texture);
-        gl.uniform1i(this.uniforms["texture"], 0);
-      }
-
-      if (this.uniforms.containsKey("bone_texture")) {
-        gl.activeTexture(GL.TEXTURE1);
-        gl.bindTexture(GL.TEXTURE_2D, this.bone_texture.texture);
-        gl.uniform1i(this.uniforms["bone_texture"], 1);
-      }
-
-      if (this.uniforms.containsKey("toon_texture")) {
-        gl.activeTexture(GL.TEXTURE2);
-        GL.Texture texture;
-        if(this.toon_textures.containsKey(material.toon_index)) {
-          texture = this.toon_textures[material.toon_index].texture;
-        } else {
-          texture = this.white_texture.texture;
-        }
-        gl.bindTexture(GL.TEXTURE_2D, texture);
-        gl.uniform1i(this.uniforms["toon_texture"], 2);
-      }
-
-      gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, index_buffer.buffer);
-      gl.drawElements(GL.TRIANGLES, index_buffer.data.length, GL.UNSIGNED_SHORT, 0);
-    }
+    this.main_shader.render(elapsed);
 
     //mvp.copyInto(this.debug_axis_shader.mvp);
     //this.debug_axis_shader.render(elapsed);
