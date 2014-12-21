@@ -5,11 +5,11 @@ class WebGLBuffer {
   GL.Buffer buffer;
 }
 
-class WebGLArrayBuffer implements WebGLBuffer {
+class WebGLArrayBuffer32 implements WebGLBuffer {
   Float32List data;
   GL.Buffer buffer;
 
-  WebGLArrayBuffer(GL.RenderingContext gl, Float32List data) {
+  WebGLArrayBuffer32(GL.RenderingContext gl, Float32List data) {
     var vbo = gl.createBuffer();
     this.buffer = vbo;
     this.setData(gl, data);
@@ -24,15 +24,32 @@ class WebGLArrayBuffer implements WebGLBuffer {
   }
 }
 
-class WebGLElementArrayBuffer {
+class WebGLElementArrayBuffer16 {
   Uint16List data;
   GL.Buffer buffer;
-  WebGLElementArrayBuffer(GL.RenderingContext gl, Uint16List data) {
+  WebGLElementArrayBuffer16(GL.RenderingContext gl, Uint16List data) {
     var ibo = gl.createBuffer();
     this.buffer = ibo;
     this.setData(gl, data);
   }
   void setData(GL.RenderingContext gl, Uint16List data) {
+    gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, this.buffer);
+    gl.bufferDataTyped(GL.ELEMENT_ARRAY_BUFFER, data, GL.STATIC_DRAW);
+    gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, null);
+
+    this.data = data;
+  }
+}
+
+class WebGLElementArrayBuffer32 {
+  Uint32List data;
+  GL.Buffer buffer;
+  WebGLElementArrayBuffer32(GL.RenderingContext gl, Uint32List data) {
+    var ibo = gl.createBuffer();
+    this.buffer = ibo;
+    this.setData(gl, data);
+  }
+  void setData(GL.RenderingContext gl, Uint32List data) {
     gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, this.buffer);
     gl.bufferDataTyped(GL.ELEMENT_ARRAY_BUFFER, data, GL.STATIC_DRAW);
     gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, null);

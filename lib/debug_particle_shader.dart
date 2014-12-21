@@ -57,9 +57,9 @@ class DebugParticleShader extends WebGLRenderer
   Map<String, GL.UniformLocation> uniforms;
 
   //debug buffer
-  WebGLArrayBuffer position_buffer;
-  WebGLArrayBuffer color_buffer;
-  WebGLArrayBuffer point_size_buffer;
+  WebGLArrayBuffer32 position_buffer;
+  WebGLArrayBuffer32 color_buffer;
+  WebGLArrayBuffer32 point_size_buffer;
 
   //debug info
   List<DebugVertex> vertices;
@@ -97,9 +97,9 @@ class DebugParticleShader extends WebGLRenderer
     ]);
 
     this.mvp = new Matrix4.identity();
-    this.color_buffer = new WebGLArrayBuffer(gl, new Float32List.fromList([]));
-    this.position_buffer = new WebGLArrayBuffer(gl, new Float32List.fromList([]));
-    this.point_size_buffer = new WebGLArrayBuffer(gl, new Float32List.fromList([]));
+    this.color_buffer = new WebGLArrayBuffer32(gl, new Float32List.fromList([]));
+    this.position_buffer = new WebGLArrayBuffer32(gl, new Float32List.fromList([]));
+    this.point_size_buffer = new WebGLArrayBuffer32(gl, new Float32List.fromList([]));
   }
 
 

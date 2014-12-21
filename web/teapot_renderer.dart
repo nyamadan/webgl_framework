@@ -45,10 +45,10 @@ class TeapotRenderer extends WebGLRenderer {
   Map<String, int> attributes;
   Map<String, GL.UniformLocation> uniforms;
 
-  WebGLArrayBuffer position_buffer;
-  WebGLArrayBuffer normal_buffer;
-  WebGLArrayBuffer coord_buffer;
-  WebGLElementArrayBuffer index_buffer;
+  WebGLArrayBuffer32 position_buffer;
+  WebGLArrayBuffer32 normal_buffer;
+  WebGLArrayBuffer32 coord_buffer;
+  WebGLElementArrayBuffer16 index_buffer;
   WebGLCanvasTexture texture;
 
   void _initialize() {
@@ -68,10 +68,10 @@ class TeapotRenderer extends WebGLRenderer {
       "texture",
     ]);
 
-    this.position_buffer = new WebGLArrayBuffer(gl, teapot.positions);
-    this.normal_buffer = new WebGLArrayBuffer(gl, teapot.normals);
-    this.coord_buffer = new WebGLArrayBuffer(gl, teapot.coords);
-    this.index_buffer = new WebGLElementArrayBuffer(gl, teapot.indices);
+    this.position_buffer = new WebGLArrayBuffer32(gl, teapot.positions);
+    this.normal_buffer = new WebGLArrayBuffer32(gl, teapot.normals);
+    this.coord_buffer = new WebGLArrayBuffer32(gl, teapot.coords);
+    this.index_buffer = new WebGLElementArrayBuffer16(gl, teapot.indices);
 
     gl.enable(GL.DEPTH_TEST);
     gl.clearColor(0.5, 0.5, 0.5, 1.0);
