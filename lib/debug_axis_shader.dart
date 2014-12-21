@@ -55,8 +55,8 @@ class DebugAxisShader extends WebGLRenderer
   Map<String, GL.UniformLocation> uniforms;
 
   //debug buffer
-  WebGLArrayBuffer position_buffer;
-  WebGLArrayBuffer color_buffer;
+  WebGLArrayBuffer32 position_buffer;
+  WebGLArrayBuffer32 color_buffer;
 
   //debug info
   List<DebugAxis> axises;
@@ -93,8 +93,8 @@ class DebugAxisShader extends WebGLRenderer
     ]);
 
     this.mvp = new Matrix4.identity();
-    this.color_buffer = new WebGLArrayBuffer(gl, new Float32List.fromList([]));
-    this.position_buffer = new WebGLArrayBuffer(gl, new Float32List.fromList([]));
+    this.color_buffer = new WebGLArrayBuffer32(gl, new Float32List.fromList([]));
+    this.position_buffer = new WebGLArrayBuffer32(gl, new Float32List.fromList([]));
   }
 
   void render(double elapsed) {
