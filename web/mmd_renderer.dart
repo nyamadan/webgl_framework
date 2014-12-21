@@ -3,6 +3,7 @@ library mmd_renderer;
 import 'dart:html';
 import 'dart:typed_data';
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as Math;
 import 'dart:web_gl' as GL;
 
@@ -13,6 +14,7 @@ import "package:logging/logging.dart";
 import "sjis_to_string.dart";
 
 part 'pmd_parser.dart';
+part 'pmx_parser.dart';
 part 'vmd_parser.dart';
 part 'main_shader.dart';
 part 'edge_shader.dart';

@@ -285,6 +285,7 @@ class PMD_Model {
     "name: ${this.name}",
     "comment: ${this.comment}",
     "triangles: ${this.triangles != null ? "..." : null}",
+    "vertices: ${this.vertices != null ? "..." : null}",
     "materials: ${this.materials != null ? "..." : null}",
     "bones: ${this.bones != null ? "..." : null}",
     "iks: ${this.iks != null ? "..." : null}",

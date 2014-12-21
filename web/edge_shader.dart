@@ -144,7 +144,7 @@ class EdgeShader extends WebGLRenderer {
   {
     gl.enable(GL.DEPTH_TEST);
     gl.depthFunc(GL.LEQUAL);
-    gl.depthMask(false);
+    //gl.depthMask(false);
 
     gl.enable(GL.CULL_FACE);
     gl.frontFace(GL.CW);
