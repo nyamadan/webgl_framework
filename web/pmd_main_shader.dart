@@ -109,6 +109,7 @@ class PMD_MainShader extends WebGLRenderer {
   Map<String, WebGLCanvasTexture> textures;
   Map<int, WebGLCanvasTexture> toon_textures;
   WebGLCanvasTexture white_texture;
+  WebGLCanvasTexture diffuse_texture;
   WebGLTypedDataTexture bone_texture;
 
   GL.Program program;
@@ -242,7 +243,7 @@ class PMD_MainShader extends WebGLRenderer {
         if(this.toon_textures.containsKey(material.toon_index)) {
           texture = this.toon_textures[material.toon_index].texture;
         } else {
-          texture = this.white_texture.texture;
+          texture = this.diffuse_texture.texture;
         }
         gl.bindTexture(GL.TEXTURE_2D, texture);
         gl.uniform1i(this.uniforms["toon_texture"], 2);

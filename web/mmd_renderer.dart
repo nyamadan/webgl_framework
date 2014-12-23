@@ -144,6 +144,7 @@ class MMD_Renderer extends WebGLRenderer {
   Map<String, WebGLCanvasTexture> textures;
   Map<int, WebGLCanvasTexture> toon_textures;
   WebGLCanvasTexture white_texture;
+  WebGLCanvasTexture diffuse_texture;
   WebGLTypedDataTexture bone_texture;
 
   PMD_Model pmd;
@@ -181,6 +182,29 @@ class MMD_Renderer extends WebGLRenderer {
       width : 16, height : 16,
       color : new Vector4(1.0, 1.0, 1.0, 1.0)
     );
+
+    this.diffuse_texture = new WebGLCanvasTexture(gl, flip_y: true, width : 16, height : 16);
+    CanvasRenderingContext2D ctx = this.diffuse_texture.ctx;
+    var image_data = ctx.getImageData(0, 0, 16, 16);
+    for(int y = 0; y < 16; y++) {
+      int color = 255 - (y * 255 / 15).round();
+      for(int x = 0; x < 16; x++) {
+        int offset = (y * 16 + x) * 4;
+        image_data.data[offset + 0] = color;
+        image_data.data[offset + 1] = color;
+        image_data.data[offset + 2] = color;
+        image_data.data[offset + 3] = 0xff;
+      }
+    }
+    ctx.putImageData(image_data, 0, 0);
+    this.diffuse_texture.refresh(gl);
+
+    this.toon_textures = new Map<int, WebGLCanvasTexture>();
+    for(int i = 1; i <= 10; i++) {
+      var texture = new WebGLCanvasTexture(gl, flip_y: true, color: new Vector4(1.0, 1.0, 1.0, 1.0));
+      texture.load(gl, "toon${i.toString().padLeft(2, '0')}.bmp");
+      this.toon_textures[i] = texture;
+    }
 
     //this._loadPMD();
     this._loadPMX();
@@ -228,7 +252,6 @@ class MMD_Renderer extends WebGLRenderer {
       this.bone_buffer = new WebGLArrayBuffer32(gl, bone_buffer);
 
       this.textures = new Map<String, WebGLCanvasTexture>();
-      this.toon_textures = new Map<int, WebGLCanvasTexture>();
       this.materials = new List<MaterialNode>.generate(pmd.materials.length, (int i){
         PMD_Material pmd_material = pmd.materials[i];
         MaterialNode material = new MaterialNode();
@@ -246,12 +269,6 @@ class MMD_Renderer extends WebGLRenderer {
           var texture = new WebGLCanvasTexture(gl);
           texture.load(gl, material.texture_file_name);
           this.textures[material.texture_file_name] = texture;
-        }
-
-        if( material.toon_index != null && material.toon_index >= 1 && !this.textures.containsKey(material.texture_file_name)) {
-          var texture = new WebGLCanvasTexture(gl, flip_y: true);
-          texture.load(gl, "toon${material.toon_index.toString().padLeft(2, '0')}.bmp");
-          this.toon_textures[material.toon_index] = texture;
         }
 
         return material;
@@ -285,7 +302,13 @@ class MMD_Renderer extends WebGLRenderer {
       this.bone_buffer = new WebGLArrayBuffer32(gl, bone_buffer);
 
       this.textures = new Map<String, WebGLCanvasTexture>();
-      this.toon_textures = new Map<int, WebGLCanvasTexture>();
+
+      pmx.textures.forEach((String file_name){
+        var texture = new WebGLCanvasTexture(gl, color : new Vector4(1.0, 1.0, 1.0, 1.0));
+        texture.load(gl, file_name);
+        this.textures[file_name] = texture;
+      });
+
       this.materials = new List<MaterialNode>.generate(pmx.materials.length, (int i){
         PMX_Material pmx_material = pmx.materials[i];
         MaterialNode material = new MaterialNode();
@@ -311,18 +334,6 @@ class MMD_Renderer extends WebGLRenderer {
         }
 
         material.edge = pmx_material.edge;
-
-        if(material.texture_file_name != null && material.texture_file_name.isNotEmpty && !this.textures.containsKey(material.texture_file_name)) {
-          var texture = new WebGLCanvasTexture(gl,  color : new Vector4(1.0, 1.0, 1.0, 1.0));
-          texture.load(gl, material.texture_file_name);
-          this.textures[material.texture_file_name] = texture;
-        }
-
-        if( material.toon_index != null && material.toon_index >= 1 && !this.textures.containsKey(material.texture_file_name)) {
-          var texture = new WebGLCanvasTexture(gl, flip_y: true, color: new Vector4(1.0, 1.0, 1.0, 1.0));
-          texture.load(gl, "toon${material.toon_index.toString().padLeft(2, '0')}.bmp");
-          this.toon_textures[material.toon_index] = texture;
-        }
 
         return material;
       });
@@ -583,6 +594,7 @@ class MMD_Renderer extends WebGLRenderer {
     this.main_shader.textures = this.textures;
     this.main_shader.toon_textures = this.toon_textures;
     this.main_shader.white_texture = this.white_texture;
+    this.main_shader.diffuse_texture = this.diffuse_texture;
     this.main_shader.bone_texture = this.bone_texture;
     this.main_shader.model = model;
     this.main_shader.view = view;

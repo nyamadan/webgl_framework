@@ -856,11 +856,11 @@ class PMX_Model {
 
     switch(this.vertex_index_size) {
       case 1:
-        return new Uint8List.fromList(this.triangles);
+        return new Uint8List.fromList(triangles);
       case 2:
-        return new Uint16List.fromList(this.triangles);
+        return new Uint16List.fromList(triangles);
       case 4:
-        return new Uint32List.fromList(this.triangles);
+        return new Uint32List.fromList(triangles);
     }
     return null;
   }
