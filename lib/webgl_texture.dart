@@ -87,15 +87,7 @@ class WebGLCanvasTexture {
 
     this.ctx = this.canvas.getContext("2d");
     if(color != null) {
-      int r = (Math.min(Math.max(color.r, 0.0), 1.0) * 0xff).toInt();
-      int g = (Math.min(Math.max(color.g, 0.0), 1.0) * 0xff).toInt();
-      int b = (Math.min(Math.max(color.b, 0.0), 1.0) * 0xff).toInt();
-      num a = Math.min(Math.max(color.a, 0.0), 1.0);
-
-      var fillStyle_orig = ctx.fillStyle;
-      this.ctx.setFillColorRgb(r, g, b, a);
-      this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-      this.ctx.fillStyle = fillStyle_orig;
+      this._setColor(color);
     }
 
     this.texture = gl.createTexture();
@@ -111,6 +103,18 @@ class WebGLCanvasTexture {
     gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.LINEAR);
     gl.texImage2DCanvas(GL.TEXTURE_2D, 0, this.internal_format, this.format, this.type, this.canvas);
     gl.bindTexture(GL.TEXTURE_2D, null);
+  }
+
+  void _setColor(Vector4 color) {
+    int r = (Math.min(Math.max(color.r, 0.0), 1.0) * 0xff).toInt();
+    int g = (Math.min(Math.max(color.g, 0.0), 1.0) * 0xff).toInt();
+    int b = (Math.min(Math.max(color.b, 0.0), 1.0) * 0xff).toInt();
+    num a = Math.min(Math.max(color.a, 0.0), 1.0);
+
+    var fillStyle_orig = ctx.fillStyle;
+    this.ctx.setFillColorRgb(r, g, b, a);
+    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    this.ctx.fillStyle = fillStyle_orig;
   }
 
   void refresh(GL.RenderingContext gl) {
@@ -132,6 +136,10 @@ class WebGLCanvasTexture {
 
     ImageElement image = document.createElement("img");
     image.onLoad.listen((event){
+      if (image.width == 0 || image.height == 0) {
+        return;
+      }
+
       bool isPowerOfTwo(int x) => (x & (x - 1)) == 0x00;
       int nextHighestPowerOfTwo(int x) {
         --x;
@@ -149,7 +157,7 @@ class WebGLCanvasTexture {
         this.canvas.height = nextHighestPowerOfTwo(image.height);
       }
 
-      this.ctx.drawImage(image, 0, 0);
+      this.ctx.drawImageScaled(image, 0, 0, this.canvas.width, this.canvas.height);
       this.refresh(gl);
       completer.complete(this);
     });
