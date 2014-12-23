@@ -93,7 +93,7 @@ class PMD_EdgeShader extends WebGLRenderer {
   WebGLArrayBuffer32 normal_buffer;
   WebGLArrayBuffer32 bone_buffer;
 
-  List<WebGLElementArrayBuffer16> index_buffer_list;
+  List<WebGLBuffer> index_buffer_list;
   WebGLTypedDataTexture bone_texture;
 
   GL.Program program;

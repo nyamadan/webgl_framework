@@ -545,7 +545,7 @@ class PMX_Material {
     offset += 1;
 
     if(toon_mode == 0) {
-      this.toon_index = view.getUint8(offset);
+      this.toon_index = view.getInt8(offset);
       offset += 1;
     }
     if(toon_mode == 1) {
@@ -818,6 +818,16 @@ class PMX_Model {
     offset = this._getTextures(buffer, view, offset);
     offset = this._getMaterials(buffer, view, offset);
     offset = this._getBones(buffer, view, offset);
+
+    log.info(this);
+    log.fine("<bones>");
+    this.bones.forEach((PMX_Bone bone){
+      log.fine(bone);
+    });
+    log.fine("<materials>");
+    this.materials.forEach((PMX_Material material){
+      log.fine(material);
+    });
   }
 
   TypedData createTriangleList([int index = null]) {

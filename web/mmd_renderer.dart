@@ -119,16 +119,13 @@ class MaterialNode {
   Vector3 ambient;
 
   int toon_index;
-  int toon_texture_index;
 
+  String toon_texture_file_name;
   String texture_file_name;
 
   bool edge;
 
   int face_vert_count;
-
-  MaterialNode (){
-  }
 }
 
 class MMD_Renderer extends WebGLRenderer {
@@ -168,6 +165,7 @@ class MMD_Renderer extends WebGLRenderer {
   void _initialize() {
     gl.getExtension("OES_texture_float");
     gl.getExtension("OES_texture_float_linear");
+    gl.getExtension("OES_element_index_uint");
 
     this.debug_particle_shader = new DebugParticleShader(this.dom.width, this.dom.height);
 
@@ -179,8 +177,13 @@ class MMD_Renderer extends WebGLRenderer {
     this.main_shader = new PMD_MainShader.copy(this);
     this.edge_shader = new PMD_EdgeShader.copy(this);
 
-    this._loadPMD();
-    //this._loadPMX();
+    this.white_texture = new WebGLCanvasTexture(gl,
+      width : 16, height : 16,
+      color : new Vector4(1.0, 1.0, 1.0, 1.0)
+    );
+
+    //this._loadPMD();
+    this._loadPMX();
     this._loadVMD();
   }
 
@@ -238,16 +241,8 @@ class MMD_Renderer extends WebGLRenderer {
         material.shiness = pmd_material.shiness;
         material.specular = new Vector3.copy(pmd_material.specular);
         material.texture_file_name = pmd_material.texture_file_name;
-        return material;
-      });
 
-      this.white_texture = new WebGLCanvasTexture(gl,
-      width : 16, height : 16,
-      color : new Vector4(1.0, 1.0, 1.0, 1.0)
-      );
-
-      this.materials.forEach((MaterialNode material){
-        if( material.texture_file_name.isNotEmpty && !this.textures.containsKey(material.texture_file_name)) {
+        if(material.texture_file_name != null && material.texture_file_name.isNotEmpty && !this.textures.containsKey(material.texture_file_name)) {
           var texture = new WebGLCanvasTexture(gl);
           texture.load(gl, material.texture_file_name);
           this.textures[material.texture_file_name] = texture;
@@ -258,6 +253,8 @@ class MMD_Renderer extends WebGLRenderer {
           texture.load(gl, "toon${material.toon_index.toString().padLeft(2, '0')}.bmp");
           this.toon_textures[material.toon_index] = texture;
         }
+
+        return material;
       });
 
       this.index_buffer_list16 = new List<WebGLElementArrayBuffer16>.generate(this.materials.length,
@@ -265,7 +262,7 @@ class MMD_Renderer extends WebGLRenderer {
       );
 
       Float32List bone_data = new Float32List(8 * 512 * 4);
-      this.bones = this._createBoneNodes(pmd.bones);
+      this.bones = this._createBoneNodesFromPMD(pmd.bones);
       this.bone_texture = new WebGLTypedDataTexture(gl, bone_data, width : 8, height : 512, type : GL.FLOAT);
       this.pmd = pmd;
     });
@@ -275,7 +272,6 @@ class MMD_Renderer extends WebGLRenderer {
     (new PMX_Model())
     .load("acfa.pmx")
     .then((PMX_Model pmx){
-      log.info(pmx);
       var position_list = pmx.createPositionList();
       var normal_list = pmx.createNormalList();
       var coord_list = pmx.createCoordList();
@@ -287,6 +283,49 @@ class MMD_Renderer extends WebGLRenderer {
       this.normal_buffer = new WebGLArrayBuffer32(gl, normal_list);
       this.coord_buffer = new WebGLArrayBuffer32(gl, coord_list);
       this.bone_buffer = new WebGLArrayBuffer32(gl, bone_buffer);
+
+      this.textures = new Map<String, WebGLCanvasTexture>();
+      this.toon_textures = new Map<int, WebGLCanvasTexture>();
+      this.materials = new List<MaterialNode>.generate(pmx.materials.length, (int i){
+        PMX_Material pmx_material = pmx.materials[i];
+        MaterialNode material = new MaterialNode();
+        material.face_vert_count = pmx_material.face_vert_count;
+        material.ambient = new Vector3.copy(pmx_material.ambient);
+        material.diffuse = new Vector4.copy(pmx_material.diffuse);
+        material.specular = new Vector3.copy(pmx_material.specular);
+        material.shiness = pmx_material.shiness;
+
+        if(pmx_material.toon_index != null && pmx_material.toon_index >= 0) {
+          switch(pmx_material.toon_mode) {
+            case 0:
+              material.toon_index = pmx_material.toon_index;
+              break;
+            case 1:
+              material.toon_texture_file_name = pmx.textures[pmx_material.toon_index];
+              break;
+          }
+        }
+
+        if(pmx_material.texture_index != null && pmx_material.texture_index >= 0) {
+          material.texture_file_name = pmx.textures[pmx_material.texture_index];
+        }
+
+        material.edge = pmx_material.edge;
+
+        if(material.texture_file_name != null && material.texture_file_name.isNotEmpty && !this.textures.containsKey(material.texture_file_name)) {
+          var texture = new WebGLCanvasTexture(gl,  color : new Vector4(1.0, 1.0, 1.0, 1.0));
+          texture.load(gl, material.texture_file_name);
+          this.textures[material.texture_file_name] = texture;
+        }
+
+        if( material.toon_index != null && material.toon_index >= 1 && !this.textures.containsKey(material.texture_file_name)) {
+          var texture = new WebGLCanvasTexture(gl, flip_y: true, color: new Vector4(1.0, 1.0, 1.0, 1.0));
+          texture.load(gl, "toon${material.toon_index.toString().padLeft(2, '0')}.bmp");
+          this.toon_textures[material.toon_index] = texture;
+        }
+
+        return material;
+      });
 
       if(pmx.vertex_index_size == 1) {
         this.index_buffer_list8 = new List<WebGLElementArrayBuffer8>.generate(this.materials.length,
@@ -301,10 +340,51 @@ class MMD_Renderer extends WebGLRenderer {
           (int i) => new WebGLElementArrayBuffer32(gl, pmx.createTriangleList(i))
         );
       }
+
+      Float32List bone_data = new Float32List(8 * 512 * 4);
+      this.bones = this._createBoneNodesFromPMX(pmx.bones);
+      this.bone_texture = new WebGLTypedDataTexture(gl, bone_data, width : 8, height : 512, type : GL.FLOAT);
+
+      this.pmx = pmx;
     });
   }
 
-  List<BoneNode> _createBoneNodes(List<PMD_Bone> pmd_bones) {
+  List<BoneNode> _createBoneNodesFromPMX(List<PMX_Bone> pmx_bones) {
+    List<BoneNode> bone_nodes = new List<BoneNode>.generate(pmx_bones.length, (int i){
+      BoneNode bone = new BoneNode();
+      PMX_Bone pmx_bone = pmx_bones[i];
+
+      bone.name = pmx_bone.name;
+      bone.original_bone_position = new Vector3.copy(pmx_bone.bone_head_pos);
+
+      if(pmx_bone.parent_bone_index >= 0) {
+        PMX_Bone parent_pmd_bone = pmx_bones[pmx_bone.parent_bone_index];
+        bone.relative_bone_position = pmx_bone.bone_head_pos - parent_pmd_bone.bone_head_pos;
+      } else {
+        bone.relative_bone_position = new Vector3.copy(pmx_bone.bone_head_pos);
+      }
+      return bone;
+    });
+
+    for(int i = 0; i < pmx_bones.length; i++) {
+      PMX_Bone pmx_bone = pmx_bones[i];
+      BoneNode bone = bone_nodes[i];
+
+      if(0 <= pmx_bone.parent_bone_index  && pmx_bone.parent_bone_index < pmx_bones.length) {
+        bone.parent = bone_nodes[pmx_bone.parent_bone_index];
+      }
+
+      for(int j = 0; j < pmx_bones.length; j++) {
+        if(pmx_bones[j].parent_bone_index == i) {
+          bone.children.add(bone_nodes[j]);
+        }
+      }
+    }
+
+    return bone_nodes;
+  }
+
+  List<BoneNode> _createBoneNodesFromPMD(List<PMD_Bone> pmd_bones) {
     List<BoneNode> bone_nodes = new List<BoneNode>.generate(pmd_bones.length, (int i){
       BoneNode bone = new BoneNode();
       PMD_Bone pmd_bone = pmd_bones[i];
@@ -407,7 +487,9 @@ class MMD_Renderer extends WebGLRenderer {
     //bones[69].rotation.setAxisAngle(new Vector3(1.0, 0.0, 0.0), 1.0);
     bones.where((BoneNode bone) => bone.parent == null).forEach((BoneNode bone) => bone.update());
 
-    iks.forEach((ik) => this._updateIK(bones, ik));
+    if(iks != null) {
+      iks.forEach((ik) => this._updateIK(bones, ik));
+    }
 
     //debug output
     bones.forEach((bone){
@@ -430,7 +512,7 @@ class MMD_Renderer extends WebGLRenderer {
     this.debug_particle_shader.vertices = new List<DebugVertex>();
     this.debug_axis_shader.axises = new List<DebugAxis>();
 
-    if (this.pmd == null || this.vmd == null) {
+    if ((this.pmx == null && this.pmd == null) || this.vmd == null) {
       return;
     }
 
@@ -456,7 +538,11 @@ class MMD_Renderer extends WebGLRenderer {
     Matrix4 model = rot;
     Matrix4 mvp = projection * view * model;
 
-    this._updateBoneAnimation(this.bones, this.pmd.iks, this.vmd, this.frame, this.bone_texture.data);
+    if(this.pmd != null) {
+      this._updateBoneAnimation(this.bones, this.pmd.iks, this.vmd, this.frame, this.bone_texture.data);
+    } else if(this.pmx != null) {
+      this._updateBoneAnimation(this.bones, null, this.vmd, this.frame, this.bone_texture.data);
+    }
     this.bone_texture.refresh(gl);
 
     //setup shader
@@ -467,21 +553,33 @@ class MMD_Renderer extends WebGLRenderer {
     this.edge_shader.edge_buffer = this.edge_buffer;
     this.edge_shader.normal_buffer = this.normal_buffer;
     this.edge_shader.bone_buffer = this.bone_buffer;
-    this.edge_shader.index_buffer_list = this.index_buffer_list16;
+    if(this.index_buffer_list8 != null) {
+      this.edge_shader.index_buffer_list = this.index_buffer_list8;
+    } else if(this.index_buffer_list16 != null) {
+      this.edge_shader.index_buffer_list = this.index_buffer_list16;
+    } else if(this.index_buffer_list32 != null) {
+      this.edge_shader.index_buffer_list = this.index_buffer_list32;
+    }
     this.edge_shader.bone_texture = this.bone_texture;
 
     this.edge_shader.model = model;
     this.edge_shader.view = view;
     this.edge_shader.projection = projection;
     this.edge_shader.mvp = mvp;
-    this.edge_shader.render(elapsed);
+    //this.edge_shader.render(elapsed);
 
     this.main_shader.materials = this.materials;
     this.main_shader.position_buffer = this.position_buffer;
     this.main_shader.normal_buffer = this.normal_buffer;
     this.main_shader.coord_buffer = this.coord_buffer;
     this.main_shader.bone_buffer = this.bone_buffer;
-    this.main_shader.index_buffer_list = this.index_buffer_list16;
+    if(this.index_buffer_list8 != null) {
+      this.main_shader.index_buffer_list = this.index_buffer_list8;
+    } else if(this.index_buffer_list16 != null) {
+      this.main_shader.index_buffer_list = this.index_buffer_list16;
+    } else if(this.index_buffer_list32 != null) {
+      this.main_shader.index_buffer_list = this.index_buffer_list32;
+    }
     this.main_shader.textures = this.textures;
     this.main_shader.toon_textures = this.toon_textures;
     this.main_shader.white_texture = this.white_texture;
