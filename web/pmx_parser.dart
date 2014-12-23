@@ -659,7 +659,7 @@ class PMX_Model {
   }
 
   int _getHeader(ByteBuffer buffer, ByteData view, int offset) {
-    var header = buffer.asUint8List(0, 4);
+    var header = new List<int>.generate(4, (int i) => view.getUint8(offset + i));
     offset += 4;
 
     if(
@@ -818,6 +818,97 @@ class PMX_Model {
     offset = this._getTextures(buffer, view, offset);
     offset = this._getMaterials(buffer, view, offset);
     offset = this._getBones(buffer, view, offset);
+  }
+
+  TypedData createTriangleList([int index = null]) {
+    if(index == null) {
+      switch(this.vertex_index_size) {
+        case 1:
+          return new Uint8List.fromList(this.triangles);
+        case 2:
+          return new Uint16List.fromList(this.triangles);
+        case 4:
+          return new Uint32List.fromList(this.triangles);
+      }
+      return null;
+    }
+
+    int offset = 0;
+    int i = 0;
+    for(i = 0; i < index; i++) {
+      offset += this.materials[i].face_vert_count;
+    }
+
+    var triangles = this.triangles
+      .getRange(offset, offset + this.materials[i].face_vert_count)
+      .toList()
+    ;
+
+    switch(this.vertex_index_size) {
+      case 1:
+        return new Uint8List.fromList(this.triangles);
+      case 2:
+        return new Uint16List.fromList(this.triangles);
+      case 4:
+        return new Uint32List.fromList(this.triangles);
+    }
+    return null;
+  }
+
+  Float32List createPositionList() {
+    Float32List position_list = new Float32List(this.vertices.length * 3);
+    for(int i = 0; i < this.vertices.length; i++) {
+      var position = this.vertices[i].position;
+      position_list[i * 3 + 0] = position.x;
+      position_list[i * 3 + 1] = position.y;
+      position_list[i * 3 + 2] = position.z;
+    }
+    return position_list;
+  }
+
+  Float32List createNormalList() {
+    Float32List normal_list = new Float32List(this.vertices.length * 3);
+    for(int i = 0; i < this.vertices.length; i++) {
+      var normal = this.vertices[i].normal;
+      normal_list[i * 3 + 0] = normal.x;
+      normal_list[i * 3 + 1] = normal.y;
+      normal_list[i * 3 + 2] = normal.z;
+    }
+    return normal_list;
+  }
+
+  Float32List createEdgeList() {
+    Float32List edge_list = new Float32List(this.vertices.length);
+    for(int i = 0; i < this.vertices.length; i++) {
+      edge_list[i] = this.vertices[i].edge_weight;
+    }
+    return edge_list;
+  }
+
+  Float32List createBoneList() {
+    Float32List bone_list = new Float32List(this.vertices.length * 3);
+    for(int i = 0; i < this.vertices.length; i++) {
+      PMX_Vertex vertex = this.vertices[i];
+      bone_list[i * 3 + 0] = vertex.bone1 * 1.0;
+      if(vertex.bone2 == null) {
+        bone_list[i * 3 + 1] = vertex.bone1 * 1.0;
+        bone_list[i * 3 + 2] = 1.0;
+      } else {
+        bone_list[i * 3 + 1] = vertex.bone2 * 1.0;
+        bone_list[i * 3 + 2] = vertex.bone1_weight / 100.0;
+      }
+    }
+    return bone_list;
+  }
+
+  Float32List createCoordList() {
+    Float32List normal_list = new Float32List(this.vertices.length * 2);
+    for(int i = 0; i < this.vertices.length; i++) {
+      var coord = this.vertices[i].coord;
+      normal_list[i * 2 + 0] = coord.x;
+      normal_list[i * 2 + 1] = coord.y;
+    }
+    return normal_list;
   }
 
   String toString() => ["{", [

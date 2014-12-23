@@ -67,8 +67,7 @@ class PMD_Vertex {
 }
 
 class PMD_Material {
-  Vector3 diffuse;
-  double alpha;
+  Vector4 diffuse;
   double shiness;
   Vector3 specular;
   Vector3 ambient;
@@ -78,17 +77,16 @@ class PMD_Material {
   String texture_file_name;
 
   int parse(ByteBuffer buffer, ByteData view, int offset){
-    var diffuse = new Vector3.zero();
+    var diffuse = new Vector4.zero();
     diffuse.x = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
     offset += 4;
     diffuse.y = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
     offset += 4;
     diffuse.z = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
     offset += 4;
-    this.diffuse = diffuse;
-
-    this.alpha = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+    diffuse.w = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
     offset += 4;
+    this.diffuse = diffuse;
 
     this.shiness = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
     offset += 4;
@@ -129,6 +127,17 @@ class PMD_Material {
 
     return offset;
   }
+
+  String toString() => ["{", [
+    "diffuse: ${this.diffuse}",
+    "shiness: ${this.shiness}",
+    "speculaer: ${this.specular}",
+    "ambient: ${this.ambient}",
+    "toon_index: ${this.toon_index}",
+    "edge_flag: ${this.edge_flag}",
+    "face_vert_count: ${this.face_vert_count}",
+    "texture_file_name: ${this.texture_file_name}",
+  ].join(", "), "}"].join("");
 }
 
 class PMD_Bone {
@@ -324,16 +333,25 @@ class PMD_Model {
     offset = this._getMorphs(buffer, view, offset);
 
     log.info(this);
+    log.fine("<bones>");
     for(int i = 0; i < this.bones.length; i++) {
       PMD_Bone bone = this.bones[i];
       String n = i.toString().padLeft(4, "0");
       log.fine("$n: $bone");
     }
 
+    log.fine("<iks>");
     for(int i = 0; i < this.iks.length; i++) {
       PMD_IK ik = this.iks[i];
       String n = i.toString().padLeft(4, "0");
       log.fine("$n: $ik");
+    }
+
+    log.fine("<materials>");
+    for(int i = 0; i < this.materials.length; i++) {
+      PMD_Material material = this.materials[i];
+      String n = i.toString().padLeft(4, "0");
+      log.fine("$n: $material");
     }
   }
 
@@ -411,20 +429,22 @@ class PMD_Model {
   }
 
   int _checkHeader(ByteBuffer buffer, ByteData view, int offset) {
-    var header = buffer.asUint8List(0, 7);
+    var header = new List<int>.generate(7, (int i) => view.getUint8(offset + i));
+    offset += 7;
+
     if(
-    header[0] != 0x50 ||
-    header[1] != 0x6d ||
-    header[2] != 0x64 ||
-    header[3] != 0x00 ||
-    header[4] != 0x00 ||
-    header[5] != 0x80 ||
-    header[6] != 0x3f
+      header[0] != 0x50 ||
+      header[1] != 0x6d ||
+      header[2] != 0x64 ||
+      header[3] != 0x00 ||
+      header[4] != 0x00 ||
+      header[5] != 0x80 ||
+      header[6] != 0x3f
     ) {
       throw(new PMD_Exception("File is not PMD"));
     }
 
-    return offset + 7;
+    return offset;
   }
 
   int _getName(ByteBuffer buffer, ByteData view, int offset) {

@@ -200,8 +200,11 @@ class PMD_EdgeShader extends WebGLRenderer {
         gl.uniform1i(this.uniforms["bone_texture"], 1);
       }
 
-      gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, index_buffer.buffer);
-      gl.drawElements(GL.TRIANGLES, index_buffer.data.length, GL.UNSIGNED_SHORT, 0);
+      if(index_buffer.byte_per_element == 2) {
+        gl.drawElements(GL.TRIANGLES, index_buffer.data.length, GL.UNSIGNED_SHORT, 0);
+      } else if(index_buffer.byte_per_element == 4) {
+        gl.drawElements(GL.TRIANGLES, index_buffer.data.length, GL.UNSIGNED_INT, 0);
+      }
     }
   }
 }

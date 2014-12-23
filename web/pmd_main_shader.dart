@@ -99,7 +99,7 @@ class PMD_MainShader extends WebGLRenderer {
   }
   """;
 
-  List<PMD_Material> materials;
+  List<MaterialNode> materials;
   WebGLArrayBuffer32 position_buffer;
   WebGLArrayBuffer32 normal_buffer;
   WebGLArrayBuffer32 coord_buffer;
@@ -214,9 +214,7 @@ class PMD_MainShader extends WebGLRenderer {
       var material = this.materials[i];
 
       if (this.uniforms.containsKey("diffuse")) {
-        var color = new Vector4.zero();
-        color.rgb = material.diffuse;
-        color.a = material.alpha;
+        var color = new Vector4.copy(material.diffuse);
         gl.uniform4fv(this.uniforms["diffuse"], color.storage);
       }
 
@@ -251,7 +249,11 @@ class PMD_MainShader extends WebGLRenderer {
       }
 
       gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, index_buffer.buffer);
-      gl.drawElements(GL.TRIANGLES, index_buffer.data.length, GL.UNSIGNED_SHORT, 0);
+      if(index_buffer.byte_per_element == 2) {
+        gl.drawElements(GL.TRIANGLES, index_buffer.data.length, GL.UNSIGNED_SHORT, 0);
+      } else if(index_buffer.byte_per_element == 4) {
+        gl.drawElements(GL.TRIANGLES, index_buffer.data.length, GL.UNSIGNED_INT, 0);
+      }
     }
   }
 }

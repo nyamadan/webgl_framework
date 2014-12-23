@@ -112,6 +112,25 @@ class BoneNode {
   ].join(", "),"}"].join("");
 }
 
+class MaterialNode {
+  Vector4 diffuse;
+  double shiness;
+  Vector3 specular;
+  Vector3 ambient;
+
+  int toon_index;
+  int toon_texture_index;
+
+  String texture_file_name;
+
+  bool edge;
+
+  int face_vert_count;
+
+  MaterialNode (){
+  }
+}
+
 class MMD_Renderer extends WebGLRenderer {
   final Logger log = new Logger("MMD_Renderer");
 
@@ -121,7 +140,9 @@ class MMD_Renderer extends WebGLRenderer {
   WebGLArrayBuffer32 bone_buffer;
   WebGLArrayBuffer32 edge_buffer;
 
+  List<WebGLElementArrayBuffer8> index_buffer_list8;
   List<WebGLElementArrayBuffer16> index_buffer_list16;
+  List<WebGLElementArrayBuffer32> index_buffer_list32;
 
   Map<String, WebGLCanvasTexture> textures;
   Map<int, WebGLCanvasTexture> toon_textures;
@@ -129,9 +150,11 @@ class MMD_Renderer extends WebGLRenderer {
   WebGLTypedDataTexture bone_texture;
 
   PMD_Model pmd;
+  PMX_Model pmx;
   VMD_Animation vmd;
 
   List<BoneNode> bones;
+  List<MaterialNode> materials;
 
   DebugParticleShader debug_particle_shader;
   DebugAxisShader debug_axis_shader;
@@ -157,6 +180,7 @@ class MMD_Renderer extends WebGLRenderer {
     this.edge_shader = new PMD_EdgeShader.copy(this);
 
     this._loadPMD();
+    //this._loadPMX();
     this._loadVMD();
   }
 
@@ -200,18 +224,29 @@ class MMD_Renderer extends WebGLRenderer {
       this.coord_buffer = new WebGLArrayBuffer32(gl, coord_list);
       this.bone_buffer = new WebGLArrayBuffer32(gl, bone_buffer);
 
-      this.index_buffer_list16 = new List<WebGLElementArrayBuffer16>.generate(pmd.materials.length,
-        (int i) => new WebGLElementArrayBuffer16(gl, pmd.createTriangleList(i))
-      );
-
-      this.white_texture = new WebGLCanvasTexture(gl,
-        width : 16, height : 16,
-        color : new Vector4(1.0, 1.0, 1.0, 1.0)
-      );
-
       this.textures = new Map<String, WebGLCanvasTexture>();
       this.toon_textures = new Map<int, WebGLCanvasTexture>();
-      pmd.materials.forEach((PMD_Material material){
+      this.materials = new List<MaterialNode>.generate(pmd.materials.length, (int i){
+        PMD_Material pmd_material = pmd.materials[i];
+        MaterialNode material = new MaterialNode();
+
+        material.ambient = new Vector3.copy(pmd_material.ambient);
+        material.diffuse = new Vector4.copy(pmd_material.diffuse);
+        material.toon_index = pmd_material.toon_index;
+        material.edge = pmd_material.edge_flag != 0 ? true : false;
+        material.face_vert_count = pmd_material.face_vert_count;
+        material.shiness = pmd_material.shiness;
+        material.specular = new Vector3.copy(pmd_material.specular);
+        material.texture_file_name = pmd_material.texture_file_name;
+        return material;
+      });
+
+      this.white_texture = new WebGLCanvasTexture(gl,
+      width : 16, height : 16,
+      color : new Vector4(1.0, 1.0, 1.0, 1.0)
+      );
+
+      this.materials.forEach((MaterialNode material){
         if( material.texture_file_name.isNotEmpty && !this.textures.containsKey(material.texture_file_name)) {
           var texture = new WebGLCanvasTexture(gl);
           texture.load(gl, material.texture_file_name);
@@ -225,15 +260,52 @@ class MMD_Renderer extends WebGLRenderer {
         }
       });
 
+      this.index_buffer_list16 = new List<WebGLElementArrayBuffer16>.generate(this.materials.length,
+        (int i) => new WebGLElementArrayBuffer16(gl, pmd.createTriangleList(i))
+      );
+
       Float32List bone_data = new Float32List(8 * 512 * 4);
-      this._createBoneNodes(pmd.bones);
+      this.bones = this._createBoneNodes(pmd.bones);
       this.bone_texture = new WebGLTypedDataTexture(gl, bone_data, width : 8, height : 512, type : GL.FLOAT);
       this.pmd = pmd;
     });
   }
 
-  void _createBoneNodes(List<PMD_Bone> pmd_bones) {
-    this.bones = new List<BoneNode>.generate(pmd_bones.length, (int i){
+  void _loadPMX() {
+    (new PMX_Model())
+    .load("acfa.pmx")
+    .then((PMX_Model pmx){
+      log.info(pmx);
+      var position_list = pmx.createPositionList();
+      var normal_list = pmx.createNormalList();
+      var coord_list = pmx.createCoordList();
+      var bone_buffer = pmx.createBoneList();
+      var edge_buffer = pmx.createEdgeList();
+
+      this.position_buffer = new WebGLArrayBuffer32(gl, position_list);
+      this.edge_buffer = new WebGLArrayBuffer32(gl, edge_buffer);
+      this.normal_buffer = new WebGLArrayBuffer32(gl, normal_list);
+      this.coord_buffer = new WebGLArrayBuffer32(gl, coord_list);
+      this.bone_buffer = new WebGLArrayBuffer32(gl, bone_buffer);
+
+      if(pmx.vertex_index_size == 1) {
+        this.index_buffer_list8 = new List<WebGLElementArrayBuffer8>.generate(this.materials.length,
+          (int i) => new WebGLElementArrayBuffer8(gl, pmx.createTriangleList(i))
+        );
+      } else if(pmx.vertex_index_size == 2) {
+        this.index_buffer_list16 = new List<WebGLElementArrayBuffer16>.generate(this.materials.length,
+          (int i) => new WebGLElementArrayBuffer16(gl, pmx.createTriangleList(i))
+        );
+      } else if(pmx.vertex_index_size == 4) {
+        this.index_buffer_list32 = new List<WebGLElementArrayBuffer32>.generate(this.materials.length,
+          (int i) => new WebGLElementArrayBuffer32(gl, pmx.createTriangleList(i))
+        );
+      }
+    });
+  }
+
+  List<BoneNode> _createBoneNodes(List<PMD_Bone> pmd_bones) {
+    List<BoneNode> bone_nodes = new List<BoneNode>.generate(pmd_bones.length, (int i){
       BoneNode bone = new BoneNode();
       PMD_Bone pmd_bone = pmd_bones[i];
 
@@ -252,18 +324,20 @@ class MMD_Renderer extends WebGLRenderer {
 
     for(int i = 0; i < pmd_bones.length; i++) {
       PMD_Bone pmd_bone = pmd_bones[i];
-      BoneNode bone = this.bones[i];
+      BoneNode bone = bone_nodes[i];
 
       if(0 <= pmd_bone.parent_bone_index  && pmd_bone.parent_bone_index < pmd_bones.length) {
-        bone.parent = this.bones[pmd_bone.parent_bone_index];
+        bone.parent = bone_nodes[pmd_bone.parent_bone_index];
       }
 
       for(int j = 0; j < pmd_bones.length; j++) {
         if(pmd_bones[j].parent_bone_index == i) {
-          bone.children.add(bones[j]);
+          bone.children.add(bone_nodes[j]);
         }
       }
     }
+
+    return bone_nodes;
   }
 
   void _writeBoneTexture(List<BoneNode> bones, Float32List bone_data) {
@@ -402,7 +476,7 @@ class MMD_Renderer extends WebGLRenderer {
     this.edge_shader.mvp = mvp;
     this.edge_shader.render(elapsed);
 
-    this.main_shader.materials = this.pmd.materials;
+    this.main_shader.materials = this.materials;
     this.main_shader.position_buffer = this.position_buffer;
     this.main_shader.normal_buffer = this.normal_buffer;
     this.main_shader.coord_buffer = this.coord_buffer;
