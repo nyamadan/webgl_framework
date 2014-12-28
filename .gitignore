@@ -17,3 +17,6 @@ pubspec.lock
 #WebStrom
 .idea/
 
+web/model/
+web/motion/
+web/toon/
