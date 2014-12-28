@@ -52,6 +52,7 @@ class BoneNode {
 
   BoneNode ik_target_bone = null;
   int ik_iterations;
+  double max_angle;
   List<IKNode> iks = new List<IKNode>();
 
   void applyVMD(VMD_Animation vmd, int frame) {
@@ -224,8 +225,8 @@ class MMD_Renderer extends WebGLRenderer {
       this.toon_textures[i] = texture;
     }
 
-    this._loadPMD();
-    //this._loadPMX();
+    //this._loadPMD();
+    this._loadPMX();
     this._loadVMD();
   }
 
@@ -247,7 +248,7 @@ class MMD_Renderer extends WebGLRenderer {
 
   void _loadVMD() {
     (new VMD_Animation())
-    .load("ik_test.vmd")
+    .load("miku.vmd")
     .then((VMD_Animation vmd) {
       this.vmd = vmd;
     });
@@ -388,6 +389,7 @@ class MMD_Renderer extends WebGLRenderer {
       bone.name = pmx_bone.name;
       bone.original_bone_position = new Vector3.copy(pmx_bone.bone_head_pos);
       bone.ik_iterations = pmx_bone.iterations;
+      bone.max_angle = pmx_bone.control_weight;
       if(pmx_bone.parent_bone_index >= 0) {
         PMX_Bone parent_pmd_bone = pmx_bones[pmx_bone.parent_bone_index];
         bone.relative_bone_position = pmx_bone.bone_head_pos - parent_pmd_bone.bone_head_pos;
@@ -545,14 +547,29 @@ class MMD_Renderer extends WebGLRenderer {
 
     Vector3 axis = v1.cross(v2).normalize();
 
-    Quaternion q = new Quaternion.identity();
-    q.setAxisAngle(axis, theta);
+    if(ik.max != null || ik.min != null) {
+      Quaternion q1 = new Quaternion.identity();
+      q1.setAxisAngle(axis, Math.min(theta, ik_bone_node.max_angle));
 
-    var theta_x = Math.asin(q.x) * 2.0;
-    var theta_y = Math.asin(q.y) * 2.0;
-    var theta_z = Math.asin(q.z) * 2.0;
+      double pitch = Math.asin(q1.x) * 2.0;
+      double yaw = Math.asin(q1.y) * 2.0;
+      double roll = Math.asin(q1.z) * 2.0;
 
-    ik.bone.rotation.copyFrom(ik.bone.rotation * q);
+      ik.bone.euler_angle.x += pitch;
+      ik.bone.euler_angle.y += yaw;
+      ik.bone.euler_angle.z += roll;
+
+      ik.bone.euler_angle.x = Math.min(Math.max(ik.bone.euler_angle.x, ik.min.x), ik.max.x);
+      ik.bone.euler_angle.y = Math.min(Math.max(ik.bone.euler_angle.y, ik.min.y), ik.max.y);
+      ik.bone.euler_angle.z = Math.min(Math.max(ik.bone.euler_angle.z, ik.min.z), ik.max.z);
+      ik.bone.rotation.setEuler(ik.bone.euler_angle.y, ik.bone.euler_angle.x, ik.bone.euler_angle.z);
+    } else {
+      Quaternion q = new Quaternion.identity();
+      q.setAxisAngle(axis, Math.min(theta, ik_bone_node.max_angle));
+
+      ik.bone.rotation.copyFrom(ik.bone.rotation * q);
+    }
+
     ik.bone.update();
   }
 

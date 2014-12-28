@@ -33,19 +33,20 @@ class PMX_IK {
 
     if(rotation_limit != 0) {
       this.min = new Vector3.zero();
-      this.min.x = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+      this.max = new Vector3.zero();
+
+      this.max.x = -view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
       offset += 4;
-      this.min.y = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+      this.max.y = -view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
       offset += 4;
-      this.min.z = -view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+      this.min.z = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
       offset += 4;
 
-      this.max = new Vector3.zero();
-      this.max.x = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+      this.min.x = -view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
       offset += 4;
-      this.max.y = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+      this.min.y = -view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
       offset += 4;
-      this.max.z = -view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+      this.max.z = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
       offset += 4;
     }
 
