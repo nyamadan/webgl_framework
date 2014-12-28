@@ -225,8 +225,8 @@ class MMD_Renderer extends WebGLRenderer {
       this.toon_textures[i] = texture;
     }
 
-    //this._loadPMD();
-    this._loadPMX();
+    this._loadPMD();
+    //this._loadPMX();
     this._loadVMD();
   }
 
@@ -505,16 +505,17 @@ class MMD_Renderer extends WebGLRenderer {
 
     if(child_bone.name == "左ひざ" || child_bone.name == "右ひざ") {
       Quaternion q = new Quaternion.identity();
-      q.setAxisAngle(axis, theta);
-      var theta_x = Math.asin(q.x) * 2.0;
-      child_bone.euler_angle.x = Math.max(0.0, Math.min(Math.PI, child_bone.euler_angle.x + theta_x * ik.control_weight));
+      q.setAxisAngle(axis, Math.min(theta, ik.control_weight * 4.0));
 
-      Quaternion p = new Quaternion.identity();
-      p.setAxisAngle(new Vector3(1.0, 0.0, 0.0), child_bone.euler_angle.x);
-      child_bone.rotation.copyFrom(p);
+      var theta_x = Math.asin(q.x) * 2.0;
+      child_bone.euler_angle.x += theta_x;
+      child_bone.euler_angle.x = Math.max(0.05 * Math.PI / 180.0, child_bone.euler_angle.x);
+      child_bone.euler_angle.x = Math.min(Math.PI, child_bone.euler_angle.x);
+
+      child_bone.rotation.setEuler(0.0, child_bone.euler_angle.x, 0.0);
     } else {
       Quaternion q = new Quaternion.identity();
-      q.setAxisAngle(axis, theta * ik.control_weight);
+      q.setAxisAngle(axis, Math.min(theta, ik.control_weight * 4.0));
       child_bone.rotation.copyFrom(child_bone.rotation * q);
     }
 
@@ -523,9 +524,6 @@ class MMD_Renderer extends WebGLRenderer {
 
   void _updatePMDIK(List<BoneNode> bones, PMD_IK ik) {
     List<BoneNode> child_bones = ik.child_bones.map((int i) => bones[i]).toList();
-
-    //最初にまげておく
-    child_bones.forEach((child_bone) => child_bone.euler_angle.x = Math.PI * ik.control_weight);
 
     BoneNode ik_bone_node = bones[ik.bone_index];
     BoneNode target_bone_node = bones[ik.target_bone_index];
