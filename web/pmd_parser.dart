@@ -188,7 +188,7 @@ class PMD_IK {
   int bone_index;
   int target_bone_index;
   int iterations;
-  double control_weight;
+  double max_angle;
   List<int> child_bones;
 
   int parse(ByteBuffer buffer, ByteData view, int offset) {
@@ -204,7 +204,7 @@ class PMD_IK {
     this.iterations = view.getUint16(offset, Endianness.LITTLE_ENDIAN);
     offset += 2;
 
-    this.control_weight = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+    this.max_angle = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
     offset += 4;
 
     this.child_bones = new List<int>.generate(chain_length, (int i){
@@ -221,7 +221,7 @@ class PMD_IK {
     "bone_index: ${this.bone_index}",
     "target_bone_index: ${this.target_bone_index}",
     "iterations: ${this.iterations}",
-    "control_weight: ${this.control_weight}",
+    "max_angle: ${this.max_angle}",
     "child_bones: ${this.child_bones}",
   ].join(", "), "}"].join("");
 }

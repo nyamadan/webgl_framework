@@ -77,11 +77,11 @@ class PMX_Bone {
   Vector3 local_axis_x;
   Vector3 local_axis_z;
 
-  int another_parent_key;
+  int foreign_parent_key;
 
   int ik_target_bone_index;
   int iterations;
-  double control_weight;
+  double max_angle;
   List<PMX_IK> iks;
 
   String _getText(ByteBuffer buffer, ByteData view, int offset, int length, int encoding) {
@@ -170,7 +170,7 @@ class PMX_Bone {
       offset += 4;
     }
 
-    if(this.flag & 0x0800 != 0) {
+    if(this.isLocalAxis) {
       this.local_axis_x = new Vector3.zero();
       this.local_axis_x.x = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
       offset += 4;
@@ -188,8 +188,8 @@ class PMX_Bone {
       offset += 4;
     }
 
-    if(this.flag & 0x2000 != 0) {
-      this.another_parent_key = view.getInt32(offset, Endianness.LITTLE_ENDIAN);
+    if(this.isForeignParent) {
+      this.foreign_parent_key = view.getInt32(offset, Endianness.LITTLE_ENDIAN);
       offset += 4;
     }
 
@@ -200,7 +200,7 @@ class PMX_Bone {
       this.iterations = view.getUint32(offset, Endianness.LITTLE_ENDIAN);
       offset += 4;
 
-      this.control_weight = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+      this.max_angle = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
       offset += 4;
 
       int length = view.getUint32(offset, Endianness.LITTLE_ENDIAN);
@@ -216,6 +216,8 @@ class PMX_Bone {
     return offset;
   }
 
+  bool get isLocalAxis => this.flag & 0x0800 != 0;
+  bool get isForeignParent => this.flag & 0x2000 != 0;
   bool get isIKBone => this.flag & 0x0020 != 0;
 
   String toString() => ["{", [
@@ -232,10 +234,10 @@ class PMX_Bone {
     "axis: ${this.axis}",
     "local_axis_x: ${this.local_axis_x}",
     "local_axis_z: ${this.local_axis_z}",
-    "another_parent_key: ${this.another_parent_key}",
+    "foreign_parent_key: ${this.foreign_parent_key}",
     "ik_target_bone_index: ${this.ik_target_bone_index}",
     "iterations: ${this.iterations}",
-    "control_weight: ${this.control_weight}",
+    "max_angle: ${this.max_angle}",
     "iks: ${this.iks != null ? '...' : null}",
   ].join(", "), "}"].join("");
 }
