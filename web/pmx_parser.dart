@@ -192,7 +192,7 @@ class PMX_Bone {
       offset += 4;
     }
 
-    if(this.flag & 0x0020 != 0) {
+    if(this.isIKBone) {
       this.ik_target_bone_index = this._getInt(buffer, view, offset, bone_index_size);
       offset += bone_index_size;
 
@@ -214,6 +214,8 @@ class PMX_Bone {
 
     return offset;
   }
+
+  bool get isIKBone => this.flag & 0x0020 != 0;
 
   String toString() => ["{", [
     "name: ${this.name}",

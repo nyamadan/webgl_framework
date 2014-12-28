@@ -73,7 +73,7 @@ class PMD_EdgeShader extends WebGLRenderer {
     v_normal = vec4(normalize(mat3(model_matrix * m) * normal), 1.0);
 
     vec4 p = mix(p2, p1, weight);
-    p.xyz += v_normal.xyz * edge;
+    p.xyz += v_normal.xyz * edge * 0.025;
     gl_Position = projection_matrix * view_matrix * model_matrix * p;
   }
   """;
@@ -144,7 +144,6 @@ class PMD_EdgeShader extends WebGLRenderer {
   {
     gl.enable(GL.DEPTH_TEST);
     gl.depthFunc(GL.LEQUAL);
-    //gl.depthMask(false);
 
     gl.enable(GL.CULL_FACE);
     gl.frontFace(GL.CW);
@@ -200,6 +199,7 @@ class PMD_EdgeShader extends WebGLRenderer {
         gl.uniform1i(this.uniforms["bone_texture"], 1);
       }
 
+      gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, index_buffer.buffer);
       if(index_buffer.byte_per_element == 2) {
         gl.drawElements(GL.TRIANGLES, index_buffer.data.length, GL.UNSIGNED_SHORT, 0);
       } else if(index_buffer.byte_per_element == 4) {

@@ -398,8 +398,8 @@ class PMD_Model {
   Float32List createEdgeList() {
     Float32List edge_list = new Float32List(this.vertices.length);
     for(int i = 0; i < this.vertices.length; i++) {
-      if(this.vertices[i].edge_flag > 0) {
-        edge_list[i] = 0.05;
+      if(this.vertices[i].edge_flag == 0) {
+        edge_list[i] = 1.0;
       } else {
         edge_list[i] = 0.0;
       }
