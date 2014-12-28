@@ -221,7 +221,7 @@ class MMD_Renderer extends WebGLRenderer {
     this.toon_textures = new Map<int, WebGLCanvasTexture>();
     for(int i = 1; i <= 10; i++) {
       var texture = new WebGLCanvasTexture(gl, flip_y: true, color: new Vector4(1.0, 1.0, 1.0, 1.0));
-      texture.load(gl, "toon${i.toString().padLeft(2, '0')}.bmp");
+      texture.load(gl, "toon/toon${i.toString().padLeft(2, '0')}.bmp");
       this.toon_textures[i] = texture;
     }
 
@@ -248,7 +248,7 @@ class MMD_Renderer extends WebGLRenderer {
 
   void _loadVMD() {
     (new VMD_Animation())
-    .load("miku.vmd")
+    .load("motion/miku.vmd")
     .then((VMD_Animation vmd) {
       this.vmd = vmd;
     });
@@ -256,7 +256,7 @@ class MMD_Renderer extends WebGLRenderer {
 
   void _loadPMD() {
     (new PMD_Model())
-    .load("miku.pmd")
+    .load("model/miku.pmd")
     .then((PMD_Model pmd){
       var position_list = pmd.createPositionList();
       var normal_list = pmd.createNormalList();
@@ -286,7 +286,7 @@ class MMD_Renderer extends WebGLRenderer {
 
         if(material.texture_file_name != null && material.texture_file_name.isNotEmpty && !this.textures.containsKey(material.texture_file_name)) {
           var texture = new WebGLCanvasTexture(gl);
-          texture.load(gl, material.texture_file_name);
+          texture.load(gl, "model/${material.texture_file_name}");
           this.textures[material.texture_file_name] = texture;
         }
 
@@ -306,7 +306,7 @@ class MMD_Renderer extends WebGLRenderer {
 
   void _loadPMX() {
     (new PMX_Model())
-    .load("acfa.pmx")
+    .load("model/acfa.pmx")
     .then((PMX_Model pmx){
       var position_list = pmx.createPositionList();
       var normal_list = pmx.createNormalList();
@@ -324,7 +324,7 @@ class MMD_Renderer extends WebGLRenderer {
 
       pmx.textures.forEach((String file_name){
         var texture = new WebGLCanvasTexture(gl, color : new Vector4(1.0, 1.0, 1.0, 1.0));
-        texture.load(gl, file_name);
+        texture.load(gl, "model/$file_name");
         this.textures[file_name] = texture;
       });
 
