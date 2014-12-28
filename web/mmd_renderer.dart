@@ -18,6 +18,19 @@ part 'vmd_parser.dart';
 part 'pmd_main_shader.dart';
 part 'pmd_edge_shader.dart';
 
+class IKNode {
+  BoneNode bone;
+  Vector3 min;
+  Vector3 max;
+
+  String toString() => ["{",[
+    "bone : ${this.bone}",
+    "max : ${this.max}",
+    "min : ${this.min}",
+  ].join(", "),"}"].join("");
+}
+
+
 class BoneNode {
   String name;
   int bone_type = 0;
@@ -35,6 +48,7 @@ class BoneNode {
   Matrix4 relative_transform = new Matrix4.identity();
 
   BoneNode parent = null;
+  List<IKNode> iks = new List<IKNode>();
   List<BoneNode> children = new List<BoneNode>();
 
   void applyVMD(VMD_Animation vmd, int frame) {
@@ -109,6 +123,7 @@ class BoneNode {
     "absolute_transform : ${this.absolute_transform}",
     "relative_transform : ${this.relative_transform}",
     "children : ${this.children != null ? '...' : null}",
+    "iks : ${this.iks != null ? '...' : null}",
   ].join(", "),"}"].join("");
 }
 
@@ -356,6 +371,8 @@ class MMD_Renderer extends WebGLRenderer {
       this.bones = this._createBoneNodesFromPMX(pmx.bones);
       this.bone_texture = new WebGLTypedDataTexture(gl, bone_data, width : 8, height : 512, type : GL.FLOAT);
 
+      log.shout(this.bones[24].iks);
+
       this.pmx = pmx;
     });
   }
@@ -380,6 +397,22 @@ class MMD_Renderer extends WebGLRenderer {
     for(int i = 0; i < pmx_bones.length; i++) {
       PMX_Bone pmx_bone = pmx_bones[i];
       BoneNode bone = bone_nodes[i];
+
+      if(pmx_bone.iks != null && pmx_bone.iks.isNotEmpty) {
+        bone.iks = pmx_bone.iks.map((PMX_IK pmx_ik){
+          IKNode ik = new IKNode();
+          ik.bone = bone_nodes[pmx_ik.bone_index];
+          if(pmx_ik.max != null) {
+            ik.max = pmx_ik.max.clone();
+          }
+          if(pmx_ik.min != null) {
+            ik.min = pmx_ik.min.clone();
+          }
+          return ik;
+        }).toList();
+
+        bone.iks = bone.iks.reversed.toList();
+      }
 
       if(0 <= pmx_bone.parent_bone_index  && pmx_bone.parent_bone_index < pmx_bones.length) {
         bone.parent = bone_nodes[pmx_bone.parent_bone_index];

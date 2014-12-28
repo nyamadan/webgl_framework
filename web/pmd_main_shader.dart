@@ -83,6 +83,7 @@ class PMD_MainShader extends WebGLRenderer {
   precision mediump float;
 
   uniform vec4 diffuse;
+  uniform vec3 ambient;
   uniform sampler2D texture;
   uniform sampler2D toon_texture;
 
@@ -92,10 +93,11 @@ class PMD_MainShader extends WebGLRenderer {
   void main(void){
     vec4 tex_color = texture2D(texture, v_coord);
 
-    float d = clamp(dot(v_normal.xyz, vec3(0.0, 0.0, 1.0)), 0.0, 1.0);
-    vec4 toon_color = texture2D(toon_texture, vec2(0.5, d));
+    float n = clamp(dot(v_normal.xyz, vec3(0.0, 0.0, 1.0)), 0.0, 1.0);
+    vec3 d = texture2D(toon_texture, vec2(0.5, n)).rgb;
+    vec3 color = diffuse.rgb * tex_color.rgb * (d + ambient);
 
-    gl_FragColor = vec4(diffuse.rgb * tex_color.rgb * toon_color.rgb, diffuse.a);
+    gl_FragColor = vec4(color, diffuse.a * tex_color.a);
   }
   """;
 
@@ -149,6 +151,7 @@ class PMD_MainShader extends WebGLRenderer {
 
     this.uniforms = this.getUniformLocations(this.program, [
       "diffuse",
+      "ambient",
       "texture",
       "toon_texture",
       "bone_texture",
@@ -217,6 +220,11 @@ class PMD_MainShader extends WebGLRenderer {
       if (this.uniforms.containsKey("diffuse")) {
         var color = new Vector4.copy(material.diffuse);
         gl.uniform4fv(this.uniforms["diffuse"], color.storage);
+      }
+
+      if (this.uniforms.containsKey("ambient")) {
+        var color = new Vector3.copy(material.ambient);
+        gl.uniform3fv(this.uniforms["ambient"], color.storage);
       }
 
       if (this.uniforms.containsKey("texture")) {
