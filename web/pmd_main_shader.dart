@@ -95,7 +95,7 @@ class PMD_MainShader extends WebGLRenderer {
 
     float n = clamp(dot(v_normal.xyz, vec3(0.0, 0.0, 1.0)), 0.0, 1.0);
     vec3 d = texture2D(toon_texture, vec2(0.5, n)).rgb;
-    vec3 color = diffuse.rgb * tex_color.rgb * (d + ambient);
+    vec3 color = diffuse.rgb * tex_color.rgb * clamp(d + ambient, 0.0, 1.0);
 
     gl_FragColor = vec4(color, diffuse.a * tex_color.a);
   }
