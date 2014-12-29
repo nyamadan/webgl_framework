@@ -35,8 +35,8 @@ class WebGLTypedDataTexture {
     } else {
       gl.pixelStorei(GL.UNPACK_FLIP_Y_WEBGL, 0);
     }
-    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE);
-    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE);
+    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, GL.MIRRORED_REPEAT);
+    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.MIRRORED_REPEAT);
     gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.LINEAR);
     gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.LINEAR);
     gl.texImage2DTyped(GL.TEXTURE_2D, 0, this.internal_format, this.width, this.height, 0, this.format, this.type, this.data);
@@ -58,6 +58,15 @@ class WebGLTypedDataTexture {
 }
 
 class WebGLCanvasTexture {
+  static bool _isPowerOfTwo(int x) => (x & (x - 1)) == 0x00;
+  static int _nextHighestPowerOfTwo(int x) {
+    --x;
+    for(int i = 1; i < 32; i <<= 1) {
+      x = x | x >> i;
+    }
+    return x + 1;
+  }
+
   CanvasElement canvas;
   CanvasRenderingContext2D ctx;
 
@@ -97,8 +106,8 @@ class WebGLCanvasTexture {
     } else {
       gl.pixelStorei(GL.UNPACK_FLIP_Y_WEBGL, 0);
     }
-    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE);
-    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE);
+    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, GL.MIRRORED_REPEAT);
+    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.MIRRORED_REPEAT);
     gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.LINEAR);
     gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.LINEAR);
     gl.texImage2DCanvas(GL.TEXTURE_2D, 0, this.internal_format, this.format, this.type, this.canvas);
@@ -125,6 +134,10 @@ class WebGLCanvasTexture {
     } else {
       gl.pixelStorei(GL.UNPACK_FLIP_Y_WEBGL, 0);
     }
+    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, GL.MIRRORED_REPEAT);
+    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.MIRRORED_REPEAT);
+    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.LINEAR);
+    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.LINEAR);
     gl.texImage2DCanvas(GL.TEXTURE_2D, 0, this.internal_format, this.format, this.type, this.canvas);
     gl.generateMipmap(GL.TEXTURE_2D);
     gl.bindTexture(GL.TEXTURE_2D, null);
@@ -134,35 +147,31 @@ class WebGLCanvasTexture {
     var completer = new Completer<WebGLCanvasTexture>();
     var future = completer.future;
 
-    ImageElement image = document.createElement("img");
-    image.onLoad.listen((event){
-      if (image.width == 0 || image.height == 0) {
+    RegExp re = new RegExp(r"\.tga$", multiLine: false,caseSensitive: false);
+    if(re.hasMatch(uri)) {
+      uri = uri.replaceFirst(re, ".png");
+    }
+
+    ImageElement img = document.createElement("img");
+    img.onLoad.listen((event){
+      if (img.width == 0 || img.height == 0) {
         return;
       }
 
-      bool isPowerOfTwo(int x) => (x & (x - 1)) == 0x00;
-      int nextHighestPowerOfTwo(int x) {
-        --x;
-        for(int i = 1; i < 32; i <<= 1) {
-          x = x | x >> i;
-        }
-        return x + 1;
-      }
-
-      if(isPowerOfTwo(image.width) && isPowerOfTwo(image.height)) {
-        this.canvas.width = image.width;
-        this.canvas.height = image.height;
+      if(_isPowerOfTwo(img.width) && _isPowerOfTwo(img.height)) {
+        this.canvas.width = img.width;
+        this.canvas.height = img.height;
       } else {
-        this.canvas.width = nextHighestPowerOfTwo(image.width);
-        this.canvas.height = nextHighestPowerOfTwo(image.height);
+        this.canvas.width = _nextHighestPowerOfTwo(img.width);
+        this.canvas.height = _nextHighestPowerOfTwo(img.height);
       }
 
-      this.ctx.drawImageScaled(image, 0, 0, this.canvas.width, this.canvas.height);
+      this.ctx.drawImageScaled(img, 0, 0, this.canvas.width, this.canvas.height);
       this.refresh(gl);
       completer.complete(this);
     });
 
-    image.src = uri;
+    img.src = uri;
 
     return future;
   }
