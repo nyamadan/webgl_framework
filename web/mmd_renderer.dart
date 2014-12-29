@@ -55,6 +55,9 @@ class BoneNode {
   double max_angle;
   List<IKNode> iks = new List<IKNode>();
 
+  BoneNode ik_parent_transform;
+  double ik_parent_transform_weight;
+
   void applyVMD(VMD_Animation vmd, int frame) {
     //リセットする
     this.rotation = new Quaternion.identity();
@@ -116,6 +119,7 @@ class BoneNode {
   }
 
   String toString() => ["{",[
+    "parent : ${this.parent != null ? this.parent.name : null }",
     "name : ${this.name}",
     "bone_type : ${this.bone_type}",
     "relative_bone_position : ${this.relative_bone_position}",
@@ -127,6 +131,8 @@ class BoneNode {
     "absolute_transform : ${this.absolute_transform}",
     "relative_transform : ${this.relative_transform}",
     "children : ${this.children != null ? '...' : null}",
+    "ik_parent_transform : ${this.ik_parent_transform != null ? this.ik_parent_transform.name : null }",
+    "ik_parent_transform_weight : ${this.ik_parent_transform_weight}",
     "iks : ${this.iks != null ? '...' : null}",
   ].join(", "),"}"].join("");
 }
@@ -375,8 +381,6 @@ class MMD_Renderer extends WebGLRenderer {
       this.bones = this._createBoneNodesFromPMX(pmx.bones);
       this.bone_texture = new WebGLTypedDataTexture(gl, bone_data, width : 8, height : 512, type : GL.FLOAT);
 
-      log.shout(this.bones[24].iks);
-
       this.pmx = pmx;
     });
   }
@@ -423,6 +427,11 @@ class MMD_Renderer extends WebGLRenderer {
 
       if(pmx_bone.parent_bone_index != null && 0 <= pmx_bone.parent_bone_index  && pmx_bone.parent_bone_index < pmx_bones.length) {
         bone.parent = bone_nodes[pmx_bone.parent_bone_index];
+      }
+
+      if(pmx_bone.ik_parent_transform_bone_index != null && 0 <= pmx_bone.ik_parent_transform_bone_index  && pmx_bone.ik_parent_transform_bone_index < pmx_bones.length) {
+        bone.ik_parent_transform = bone_nodes[pmx_bone.ik_parent_transform_bone_index];
+        bone.ik_parent_transform_weight = pmx_bone.ik_parent_transform_bone_weight;
       }
 
       for(int j = 0; j < pmx_bones.length; j++) {
@@ -572,15 +581,15 @@ class MMD_Renderer extends WebGLRenderer {
   }
 
   void _updatePMXIK(List<BoneNode> bones) {
-      bones.where((BoneNode bone) => (bone.iks != null) && bone.iks.isNotEmpty).forEach((BoneNode ik_bone_node){
-        BoneNode target_bone_node = ik_bone_node.ik_target_bone;
+    bones.where((BoneNode bone) => (bone.iks != null) && bone.iks.isNotEmpty).forEach((BoneNode ik_bone_node){
+      BoneNode target_bone_node = ik_bone_node.ik_target_bone;
 
-        for(int i = 0; i < ik_bone_node.ik_iterations; i++) {
-          ik_bone_node.iks.forEach((IKNode ik){
-            this._updateChildPMXIK(ik, ik_bone_node, target_bone_node);
-          });
-        }
-      });
+      for(int i = 0; i < ik_bone_node.ik_iterations; i++) {
+        ik_bone_node.iks.forEach((IKNode ik){
+          this._updateChildPMXIK(ik, ik_bone_node, target_bone_node);
+        });
+      }
+    });
   }
 
   void _updateBoneAnimation(List<BoneNode> bones, List<PMD_IK> iks, VMD_Animation vmd, int frame) {
@@ -594,6 +603,11 @@ class MMD_Renderer extends WebGLRenderer {
       this._updatePMXIK(this.bones);
     };
 
+    bones.where((BoneNode bone) => bone.ik_parent_transform != null).forEach((BoneNode bone){
+      slerpQuaternion(bone.rotation, bone.ik_parent_transform.rotation, bone.ik_parent_transform_weight).copyTo(bone.rotation);
+      (bone.ik_parent_transform.position * bone.ik_parent_transform_weight + bone.position * (1.0 - bone.ik_parent_transform_weight)).copyInto(bone.position);
+      bone.update();
+    });
   }
 
   void render(double elapsed) {

@@ -70,8 +70,8 @@ class PMX_Bone {
   int tail_bone_index;
   Vector3 tail_bone_pos;
 
-  int parent_transform_bone_index;
-  double transform_weight;
+  int ik_parent_transform_bone_index;
+  double ik_parent_transform_bone_weight;
 
   Vector3 axis;
   Vector3 local_axis_x;
@@ -139,7 +139,10 @@ class PMX_Bone {
     this.flag = view.getUint16(offset, Endianness.LITTLE_ENDIAN);
     offset += 2;
 
-    if(this.flag & 0x0001 == 0) {
+    if(this.flag & 0x0001 != 0) {
+      this.tail_bone_index = this._getInt(buffer, view, offset, bone_index_size);
+      offset += bone_index_size;
+    } else {
       this.tail_bone_pos = new Vector3.zero();
       this.tail_bone_pos.x = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
       offset += 4;
@@ -147,20 +150,17 @@ class PMX_Bone {
       offset += 4;
       this.tail_bone_pos.z = -view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
       offset += 4;
-    } else {
-      this.tail_bone_index = this._getInt(buffer, view, offset, bone_index_size);
-      offset += bone_index_size;
     }
 
-    if(this.flag & 0x0300 != 0) {
-      this.parent_transform_bone_index = this._getInt(buffer, view, offset, bone_index_size);
+    if(this.isParentRotation || this.isParentTranslation) {
+      this.ik_parent_transform_bone_index = this._getInt(buffer, view, offset, bone_index_size);
       offset += bone_index_size;
 
-      this.transform_weight = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+      this.ik_parent_transform_bone_weight = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
       offset += 4;
     }
 
-    if(this.flag & 0x0400 != 0) {
+    if(this.isAxis) {
       this.axis = new Vector3.zero();
       this.axis.x = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
       offset += 4;
@@ -216,9 +216,14 @@ class PMX_Bone {
     return offset;
   }
 
+  bool get isRotation => this.flag & 0x0002 != 0;
+  bool get isTranslation => this.flag & 0x0004 != 0;
   bool get isLocalAxis => this.flag & 0x0800 != 0;
   bool get isForeignParent => this.flag & 0x2000 != 0;
   bool get isIKBone => this.flag & 0x0020 != 0;
+  bool get isParentRotation => this.flag & 0x0100 != 0;
+  bool get isParentTranslation => this.flag & 0x0200 != 0;
+  bool get isAxis => this.flag & 0x0400 != 0;
 
   String toString() => ["{", [
     "name: ${this.name}",
@@ -229,8 +234,8 @@ class PMX_Bone {
     "flag: ${this.flag}",
     "tail_bone_index: ${this.tail_bone_index}",
     "tail_bone_pos: ${this.tail_bone_pos}",
-    "parent_transform_bone_index: ${this.parent_transform_bone_index}",
-    "transform_weight: ${this.transform_weight}",
+    "parent_transform_bone_index: ${this.ik_parent_transform_bone_index}",
+    "transform_weight: ${this.ik_parent_transform_bone_weight}",
     "axis: ${this.axis}",
     "local_axis_x: ${this.local_axis_x}",
     "local_axis_z: ${this.local_axis_z}",
