@@ -6,26 +6,38 @@ class PMX_Exception implements Exception {
   String toString() => "PMX_Exception\n${this.message}";
 }
 
+int _getPMXInt(ByteData view, int offset, int size) {
+  if(size == 1) {
+    return view.getInt8(offset);
+  }
+  if(size == 2) {
+    return view.getInt16(offset, Endianness.LITTLE_ENDIAN);
+  }
+  if(size == 4) {
+    return view.getInt32(offset, Endianness.LITTLE_ENDIAN);
+  }
+  return null;
+}
+
+String _getPMXText(ByteData view, int offset, int length, int encoding) {
+  if(encoding == 0) {
+    int word_length = length ~/ 2;
+    List<int> name_buffer = new List<int>.generate(word_length, (int i) => view.getUint16(offset + 2 * i, Endianness.LITTLE_ENDIAN));
+    return new String.fromCharCodes(name_buffer);
+  } else if(encoding == 1) {
+    return null;
+  }
+
+  return null;
+}
+
 class PMX_IK {
   int bone_index;
   Vector3 min;
   Vector3 max;
 
-  int _getInt(ByteBuffer buffer, ByteData view, int offset, int size) {
-    if(size == 1) {
-      return view.getInt8(offset);
-    }
-    if(size == 2) {
-      return view.getInt16(offset, Endianness.LITTLE_ENDIAN);
-    }
-    if(size == 4) {
-      return view.getInt32(offset, Endianness.LITTLE_ENDIAN);
-    }
-    return null;
-  }
-
   int parse(ByteBuffer buffer, ByteData view, int offset, int bone_index_size) {
-    this.bone_index = this._getInt(buffer, view, offset, bone_index_size);
+    this.bone_index = _getPMXInt(view, offset, bone_index_size);
     offset += bone_index_size;
 
     int rotation_limit = view.getUint8(offset);
@@ -84,42 +96,17 @@ class PMX_Bone {
   double max_angle;
   List<PMX_IK> iks;
 
-  String _getText(ByteBuffer buffer, ByteData view, int offset, int length, int encoding) {
-    if(encoding == 0) {
-      int word_length = length ~/ 2;
-      List<int> name_buffer = new List<int>.generate(word_length, (int i) => view.getUint16(offset + 2 * i, Endianness.LITTLE_ENDIAN));
-      return new String.fromCharCodes(name_buffer);
-    } else if(encoding == 1) {
-      return null;
-    }
-
-    return null;
-  }
-
-  int _getInt(ByteBuffer buffer, ByteData view, int offset, int size) {
-    if(size == 1) {
-      return view.getInt8(offset);
-    }
-    if(size == 2) {
-      return view.getInt16(offset, Endianness.LITTLE_ENDIAN);
-    }
-    if(size == 4) {
-      return view.getInt32(offset, Endianness.LITTLE_ENDIAN);
-    }
-    return null;
-  }
-
   int parse(ByteBuffer buffer, ByteData view, int offset, int encoding, int bone_index_size) {
     int name_length = view.getUint32(offset, Endianness.LITTLE_ENDIAN);
     offset += 4;
 
-    this.name = this._getText(buffer, view, offset, name_length, encoding);
+    this.name = _getPMXText(view, offset, name_length, encoding);
     offset += name_length;
 
     int english_name_length = view.getUint32(offset, Endianness.LITTLE_ENDIAN);
     offset += 4;
 
-    this.english_name = this._getText(buffer, view, offset, english_name_length, encoding);
+    this.english_name = _getPMXText(view, offset, english_name_length, encoding);
     offset += english_name_length;
 
     this.bone_head_pos = new Vector3.zero();
@@ -130,7 +117,7 @@ class PMX_Bone {
     this.bone_head_pos.z = -view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
     offset += 4;
 
-    this.parent_bone_index = this._getInt(buffer, view, offset, bone_index_size);
+    this.parent_bone_index = _getPMXInt(view, offset, bone_index_size);
     offset += bone_index_size;
 
     this.depth = view.getInt32(offset, Endianness.LITTLE_ENDIAN);
@@ -140,7 +127,7 @@ class PMX_Bone {
     offset += 2;
 
     if(this.flag & 0x0001 != 0) {
-      this.tail_bone_index = this._getInt(buffer, view, offset, bone_index_size);
+      this.tail_bone_index = _getPMXInt(view, offset, bone_index_size);
       offset += bone_index_size;
     } else {
       this.tail_bone_pos = new Vector3.zero();
@@ -153,7 +140,7 @@ class PMX_Bone {
     }
 
     if(this.isParentRotation || this.isParentTranslation) {
-      this.ik_parent_transform_bone_index = this._getInt(buffer, view, offset, bone_index_size);
+      this.ik_parent_transform_bone_index = _getPMXInt(view, offset, bone_index_size);
       offset += bone_index_size;
 
       this.ik_parent_transform_bone_weight = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
@@ -194,7 +181,7 @@ class PMX_Bone {
     }
 
     if(this.isIKBone) {
-      this.ik_target_bone_index = this._getInt(buffer, view, offset, bone_index_size);
+      this.ik_target_bone_index = _getPMXInt(view, offset, bone_index_size);
       offset += bone_index_size;
 
       this.iterations = view.getUint32(offset, Endianness.LITTLE_ENDIAN);
@@ -271,19 +258,6 @@ class PMX_Vertex {
 
   double edge_weight;
 
-  int _getInt(ByteBuffer buffer, ByteData view, int offset, int size) {
-    if(size == 1) {
-      return view.getInt8(offset);
-    }
-    if(size == 2) {
-      return view.getInt16(offset, Endianness.LITTLE_ENDIAN);
-    }
-    if(size == 4) {
-      return view.getInt32(offset, Endianness.LITTLE_ENDIAN);
-    }
-    return null;
-  }
-
   int parse(ByteBuffer buffer, ByteData view, int offset, int extra_coord_size, int bone_index_size) {
     this.position = new Vector3.zero();
     this.position.x = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
@@ -321,25 +295,25 @@ class PMX_Vertex {
 
     switch(this.blend_type) {
       case 0:
-        this.bone1 = this._getInt(buffer, view, offset, bone_index_size);
+        this.bone1 = _getPMXInt(view, offset, bone_index_size);
         offset += bone_index_size;
         break;
       case 1:
-        this.bone1 = this._getInt(buffer, view, offset, bone_index_size);
+        this.bone1 = _getPMXInt(view, offset, bone_index_size);
         offset += bone_index_size;
-        this.bone2 = this._getInt(buffer, view, offset, bone_index_size);
+        this.bone2 = _getPMXInt(view, offset, bone_index_size);
         offset += bone_index_size;
         this.bone1_weight = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
         offset += 4;
         break;
       case 2:
-        this.bone1 = this._getInt(buffer, view, offset, bone_index_size);
+        this.bone1 = _getPMXInt(view, offset, bone_index_size);
         offset += bone_index_size;
-        this.bone2 = this._getInt(buffer, view, offset, bone_index_size);
+        this.bone2 = _getPMXInt(view, offset, bone_index_size);
         offset += bone_index_size;
-        this.bone3 = this._getInt(buffer, view, offset, bone_index_size);
+        this.bone3 = _getPMXInt(view, offset, bone_index_size);
         offset += bone_index_size;
-        this.bone4 = this._getInt(buffer, view, offset, bone_index_size);
+        this.bone4 = _getPMXInt(view, offset, bone_index_size);
         offset += bone_index_size;
         this.bone1_weight = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
         offset += 4;
@@ -351,9 +325,9 @@ class PMX_Vertex {
         offset += 4;
         break;
       case 3:
-        this.bone1 = this._getInt(buffer, view, offset, bone_index_size);
+        this.bone1 = _getPMXInt(view, offset, bone_index_size);
         offset += bone_index_size;
-        this.bone2 = this._getInt(buffer, view, offset, bone_index_size);
+        this.bone2 = _getPMXInt(view, offset, bone_index_size);
         offset += bone_index_size;
         this.bone1_weight = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
         offset += 4;
@@ -383,13 +357,13 @@ class PMX_Vertex {
         offset += 4;
         break;
       case 4:
-        this.bone1 = this._getInt(buffer, view, offset, bone_index_size);
+        this.bone1 = _getPMXInt(view, offset, bone_index_size);
         offset += bone_index_size;
-        this.bone2 = this._getInt(buffer, view, offset, bone_index_size);
+        this.bone2 = _getPMXInt(view, offset, bone_index_size);
         offset += bone_index_size;
-        this.bone3 = this._getInt(buffer, view, offset, bone_index_size);
+        this.bone3 = _getPMXInt(view, offset, bone_index_size);
         offset += bone_index_size;
-        this.bone4 = this._getInt(buffer, view, offset, bone_index_size);
+        this.bone4 = _getPMXInt(view, offset, bone_index_size);
         offset += bone_index_size;
         this.bone1_weight = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
         offset += 4;
@@ -453,42 +427,17 @@ class PMX_Material {
   String comment;
   int face_vert_count;
 
-  String _getText(ByteBuffer buffer, ByteData view, int offset, int length, int encoding) {
-    if(encoding == 0) {
-      int word_length = length ~/ 2;
-      List<int> name_buffer = new List<int>.generate(word_length, (int i) => view.getUint16(offset + 2 * i, Endianness.LITTLE_ENDIAN));
-      return new String.fromCharCodes(name_buffer);
-    } else if(encoding == 1) {
-      return null;
-    }
-
-    return null;
-  }
-
-  int _getInt(ByteBuffer buffer, ByteData view, int offset, int size) {
-    if(size == 1) {
-      return view.getInt8(offset);
-    }
-    if(size == 2) {
-      return view.getInt16(offset, Endianness.LITTLE_ENDIAN);
-    }
-    if(size == 4) {
-      return view.getInt32(offset, Endianness.LITTLE_ENDIAN);
-    }
-    return null;
-  }
-
   int parse(ByteBuffer buffer, ByteData view, int offset, int encoding, int texture_index_size) {
     int name_length = view.getUint32(offset, Endianness.LITTLE_ENDIAN);
     offset += 4;
 
-    this.name = this._getText(buffer, view, offset, name_length, encoding);
+    this.name = _getPMXText(view, offset, name_length, encoding);
     offset += name_length;
 
     int english_name_length = view.getUint32(offset, Endianness.LITTLE_ENDIAN);
     offset += 4;
 
-    this.english_name = this._getText(buffer, view, offset, english_name_length, encoding);
+    this.english_name = _getPMXText(view, offset, english_name_length, encoding);
     offset += english_name_length;
 
     this.diffuse = new Vector4.zero();
@@ -542,10 +491,10 @@ class PMX_Material {
     this.edge_size = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
     offset += 4;
 
-    this.texture_index = this._getInt(buffer, view, offset, texture_index_size);
+    this.texture_index = _getPMXInt(view, offset, texture_index_size);
     offset += texture_index_size;
 
-    this.sphere_index = this._getInt(buffer, view, offset, texture_index_size);
+    this.sphere_index = _getPMXInt(view, offset, texture_index_size);
     offset += texture_index_size;
 
     this.sphere_mode = view.getUint8(offset);
@@ -559,14 +508,14 @@ class PMX_Material {
       offset += 1;
     }
     if(toon_mode == 1) {
-      this.toon_index = this._getInt(buffer, view, offset, texture_index_size);
+      this.toon_index = _getPMXInt(view, offset, texture_index_size);
       offset += texture_index_size;
     }
 
     int comment_length = view.getUint32(offset, Endianness.LITTLE_ENDIAN);
     offset += 4;
 
-    this.comment = this._getText(buffer, view, offset, comment_length, encoding);
+    this.comment = _getPMXText(view, offset, comment_length, encoding);
     offset += comment_length;
 
     this.face_vert_count = view.getUint32(offset, Endianness.LITTLE_ENDIAN);
@@ -643,31 +592,6 @@ class PMX_Model {
     return future;
   }
 
-  int _getInt(ByteBuffer buffer, ByteData view, int offset, int size) {
-    if(size == 1) {
-      return view.getInt8(offset);
-    }
-    if(size == 2) {
-      return view.getInt16(offset, Endianness.LITTLE_ENDIAN);
-    }
-    if(size == 4) {
-      return view.getInt32(offset, Endianness.LITTLE_ENDIAN);
-    }
-    return null;
-  }
-
-  String _getText(ByteBuffer buffer, ByteData view, int offset, int length) {
-    if(this.encoding == 0) {
-      int word_length = length ~/ 2;
-      List<int> name_buffer = new List<int>.generate(word_length, (int i) => view.getUint16(offset + 2 * i, Endianness.LITTLE_ENDIAN));
-      return new String.fromCharCodes(name_buffer);
-    } else if(this.encoding == 1) {
-      return null;
-    }
-
-    return null;
-  }
-
   int _getHeader(ByteBuffer buffer, ByteData view, int offset) {
     var header = new List<int>.generate(4, (int i) => view.getUint8(offset + i));
     offset += 4;
@@ -717,22 +641,22 @@ class PMX_Model {
   int _getName(ByteBuffer buffer, ByteData view, int offset) {
     int name_length = view.getUint32(offset, Endianness.LITTLE_ENDIAN);
     offset += 4;
-    this.name = this._getText(buffer, view, offset, name_length);
+    this.name = _getPMXText(view, offset, name_length, this.encoding);
     offset += name_length;
 
     int english_name_length = view.getUint32(offset, Endianness.LITTLE_ENDIAN);
     offset += 4;
-    this.english_name = this._getText(buffer, view, offset, english_name_length);
+    this.english_name = _getPMXText(view, offset, english_name_length, this.encoding);
     offset += english_name_length ;
 
     int comment_length = view.getUint32(offset, Endianness.LITTLE_ENDIAN);
     offset += 4;
-    this.comment = this._getText(buffer, view, offset, comment_length);
+    this.comment = _getPMXText(view, offset, comment_length, this.encoding);
     offset += comment_length;
 
     int english_comment_length = view.getUint32(offset, Endianness.LITTLE_ENDIAN);
     offset += 4;
-    this.english_comment = this._getText(buffer, view, offset, english_comment_length);
+    this.english_comment = _getPMXText(view, offset, english_comment_length, this.encoding);
     offset += english_comment_length;
 
     return offset;
@@ -757,13 +681,13 @@ class PMX_Model {
 
     this.triangles = new List<int>(length);
     for(int i = 0; i < length; i += 3) {
-      int v0 = this._getInt(buffer, view, offset, this.vertex_index_size);
+      int v0 = _getPMXInt(view, offset, this.vertex_index_size);
       offset += this.vertex_index_size;
 
-      int v1 = this._getInt(buffer, view, offset, this.vertex_index_size);
+      int v1 = _getPMXInt(view, offset, this.vertex_index_size);
       offset += this.vertex_index_size;
 
-      int v2 = this._getInt(buffer, view, offset, this.vertex_index_size);
+      int v2 = _getPMXInt(view, offset, this.vertex_index_size);
       offset += this.vertex_index_size;
 
       this.triangles[i + 0] = v1;
@@ -783,7 +707,7 @@ class PMX_Model {
       int texture_path_length = view.getUint16(offset, Endianness.LITTLE_ENDIAN);
       offset += 4;
 
-      String path = this._getText(buffer, view, offset, texture_path_length);
+      String path = _getPMXText(view, offset, texture_path_length, this.encoding);
       offset += texture_path_length;
       return path;
     });
@@ -915,7 +839,7 @@ class PMX_Model {
         bone_list[i * 3 + 2] = 1.0;
       } else {
         bone_list[i * 3 + 1] = vertex.bone2 * 1.0;
-        bone_list[i * 3 + 2] = vertex.bone1_weight / 100.0;
+        bone_list[i * 3 + 2] = vertex.bone1_weight;
       }
     }
     return bone_list;
