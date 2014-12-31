@@ -1,7 +1,7 @@
 part of webgl_framework;
 
 class WebGLBuffer {
-  TypedData data;
+  List data;
   GL.Buffer buffer;
   int byte_per_element;
 }

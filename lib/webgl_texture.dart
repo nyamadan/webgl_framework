@@ -54,8 +54,6 @@ class TGAParser {
       this._view = new ByteData.view(buffer);
       int offset = 0;
 
-      print("uri: $uri");
-
       this.id_length = this._view.getUint8(offset);
       offset += 1;
 
