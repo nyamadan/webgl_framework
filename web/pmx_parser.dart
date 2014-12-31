@@ -1,10 +1,5 @@
 part of mmd_renderer;
 
-class PMX_Exception implements Exception {
-  final String message;
-  const PMX_Exception(this.message);
-  String toString() => "PMX_Exception\n${this.message}";
-}
 
 int _getPMXInt(ByteData view, int offset, int size) {
   if(size == 1) {
@@ -29,6 +24,13 @@ String _getPMXText(ByteData view, int offset, int length, int encoding) {
   }
 
   return null;
+}
+
+
+class PMX_Exception implements Exception {
+  final String message;
+  const PMX_Exception(this.message);
+  String toString() => "PMX_Exception\n${this.message}";
 }
 
 class PMX_IK {
@@ -548,6 +550,83 @@ class PMX_Material {
   ].join(", "), "}"].join("");
 }
 
+class PMX_VertMorph {
+  int vertex_index;
+  Vector3 offset;
+  int parse(ByteBuffer buffer, ByteData view, int offset, int vertex_index_size) {
+    this.vertex_index = _getPMXInt(view, offset, vertex_index_size);
+    offset += vertex_index_size;
+    
+    this.offset = new Vector3.zero();
+    this.offset.x = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+    this.offset.y = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+    this.offset.z = view.getFloat32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+    return offset;
+  }
+
+  String toString() => ["{", [
+  "vertex_index:  ${this.vertex_index}",
+  "offset:  ${this.offset}",
+  ].join(", "), "}"].join("");
+}
+
+class PMX_Morph {
+  String name;
+  String english_name;
+  
+  int panel;
+  int data_type;
+  
+  List data;
+
+  int parse(ByteBuffer buffer, ByteData view, int offset, int encoding, int vertex_index_size) {
+    int name_length = view.getUint32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+    this.name = _getPMXText(view, offset, name_length, encoding);
+    offset += name_length;
+    
+    int english_name_length = view.getUint32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+    
+    this.english_name = _getPMXText(view, offset, english_name_length, encoding);
+    offset += english_name_length;
+    
+    this.panel = view.getUint8(offset);
+    offset += 1;
+    
+    this.data_type = view.getUint8(offset);
+    offset += 1;
+
+    int data_length = view.getUint32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+    
+    this.data = new List.generate(data_length, (int i){
+      switch(this.data_type) {
+        case 1:
+          PMX_VertMorph vert_morph = new PMX_VertMorph();
+          offset = vert_morph.parse(buffer, view, offset, vertex_index_size);
+          return vert_morph;
+        default:
+          throw(new PMX_Exception("Not Implemented"));
+          return null;
+      }
+    });
+    
+    return offset;
+  }
+
+  String toString() => ["{", [
+  "name: ${this.name}",
+  "english_name: ${this.english_name}",
+  "panel: ${this.panel}",
+  "data_type: ${this.data_type}",
+  "data: ${this.data != null ? "..." : null}",
+  ].join(", "), "}"].join("");
+}
+
 class PMX_Model {
   final Logger log = new Logger("PMX_Model");
 
@@ -572,6 +651,7 @@ class PMX_Model {
   List<String> textures;
   List<PMX_Material> materials;
   List<PMX_Bone> bones;
+  List<PMX_Morph> morph_list;
 
   Future<PMX_Model> load(String uri) {
     var completer = new Completer<PMX_Model>();
@@ -741,6 +821,19 @@ class PMX_Model {
     return offset;
   }
 
+  int _getMorph(ByteBuffer buffer, ByteData view, int offset) {
+    int length = view.getUint32(offset, Endianness.LITTLE_ENDIAN);
+    offset += 4;
+    
+    this.morph_list = new List<PMX_Morph>.generate(length, (int i){
+      PMX_Morph pmx_morph = new PMX_Morph();
+      offset = pmx_morph.parse(buffer, view, offset, this.encoding, this.vertex_index_size);
+      return pmx_morph;
+    });
+    
+    return offset;
+  }
+  
   void parse(ByteBuffer buffer) {
     var view = new ByteData.view(buffer);
     int offset = 0;
@@ -752,15 +845,20 @@ class PMX_Model {
     offset = this._getTextures(buffer, view, offset);
     offset = this._getMaterials(buffer, view, offset);
     offset = this._getBones(buffer, view, offset);
+    offset = this._getMorph(buffer, view, offset);
 
     log.info(this);
-    log.fine("<bones>");
+    log.fine("<<<<<<<<<<bones>>>>>>>>>>");
     this.bones.forEach((PMX_Bone bone){
       log.fine(bone);
     });
-    log.fine("<materials>");
+    log.fine("<<<<<<<<<<materials>>>>>>>>>>");
     this.materials.forEach((PMX_Material material){
       log.fine(material);
+    });
+    log.fine("<<<<<<<<<<textures>>>>>>>>>>");
+    this.textures.forEach((String texture) {
+      log.fine(texture);
     });
   }
 
@@ -875,5 +973,6 @@ class PMX_Model {
     "textures: ${this.textures != null ? "..." : null}",
     "materials: ${this.materials != null ? "..." : null}",
     "bones: ${this.bones != null ? "..." : null}",
+    "morph_list: ${this.morph_list != null ? "..." : null}",
   ].join(", "), "}"].join("");
 }

@@ -346,10 +346,10 @@ class MMD_Renderer extends WebGLRenderer {
         if(pmx_material.toon_index != null && pmx_material.toon_index >= 0) {
           switch(pmx_material.toon_mode) {
             case 0:
-              material.toon_index = pmx_material.toon_index;
+              material.toon_texture_file_name = pmx.textures[pmx_material.toon_index];
               break;
             case 1:
-              material.toon_texture_file_name = pmx.textures[pmx_material.toon_index];
+              material.toon_index = pmx_material.toon_index;
               break;
           }
         }
