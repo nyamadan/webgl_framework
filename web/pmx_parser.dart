@@ -611,7 +611,6 @@ class PMX_Morph {
           return vert_morph;
         default:
           throw(new PMX_Exception("Not Implemented"));
-          return null;
       }
     });
     
