@@ -906,9 +906,7 @@ class PMX_Model {
     return position_list;
   }
   
-  SubArrayData createSubPositionList(Map<String, double> morph_weights) {
-    int min = null;
-    int max = null;
+  List<SubArrayData> createSubPositionList(Map<String, double> morph_weights) {
     Map<int, Vector3> position_map = new Map<int, Vector3>();
     morph_weights.keys.forEach((String name) {
       PMX_Morph morph = this.morph_list.firstWhere((PMX_Morph morph) => morph.name == name, orElse: () {return null;});
@@ -923,14 +921,6 @@ class PMX_Model {
       List<PMX_VertMorph> vert_morphs = morph.data;
       
       vert_morphs.forEach((PMX_VertMorph vert_morph) {
-        if(min == null || min > vert_morph.vertex_index) {
-          min = vert_morph.vertex_index;
-        }
-
-        if(max == null || max < vert_morph.vertex_index) {
-          max = vert_morph.vertex_index;
-        }
-        
         if(!position_map.containsKey(vert_morph.vertex_index)) {
           position_map[vert_morph.vertex_index] = new Vector3.zero();
         }
@@ -938,22 +928,44 @@ class PMX_Model {
         position_map[vert_morph.vertex_index] += vert_morph.offset * morph_weights[name];
       });
     });
-
-    int v_length = max - min + 1;
-    Float32List position_list = new Float32List(v_length * 3);
-    for(int i = 0; i < v_length; i++) {
-      int v_index = i + min;
-      Vector3 position = new Vector3.copy(this.vertices[v_index].position);
-      if(position_map.containsKey(v_index)) {
-        position += position_map[v_index];
+    
+    List<int> sorted_indices = position_map.keys.toList()
+    ..sort((int a,  int b) {
+      if(a > b) {
+        return 1;
       }
-      position_list[i * 3 + 0] = position.x;
-      position_list[i * 3 + 1] = position.y;
-      position_list[i * 3 + 2] = position.z;
-    }
+      if(a < b) {
+        return -1;
+      }
+      return 0;
+    });
     
+    List<List<int>> separated_indices = new List<List<int>>();
+    int last_index = null;
+    sorted_indices.forEach((int v_index) {
+      if(last_index == null || last_index + 1 != v_index) {
+        separated_indices.add(new List<int>());
+      }
+      
+      separated_indices.last.add(v_index);
+      last_index = v_index;
+    });
     
-    return new SubArrayData(min * 3 * 4, position_list);
+    return separated_indices.map((List<int> indices){
+      int v_length = indices.last - indices.first + 1;
+      Float32List position_list = new Float32List(v_length * 3);
+      for(int i = 0; i < v_length; i++) {
+        int v_index = i + indices.first;
+        Vector3 position = new Vector3.copy(this.vertices[v_index].position);
+        if(position_map.containsKey(v_index)) {
+          position += position_map[v_index];
+        }
+        position_list[i * 3 + 0] = position.x;
+        position_list[i * 3 + 1] = position.y;
+        position_list[i * 3 + 2] = position.z;
+      }
+      return new SubArrayData(indices.first * 3 * 4, position_list);
+    }).toList();
   }
 
   Float32List createNormalList() {

@@ -662,8 +662,9 @@ class MMD_Renderer extends WebGLRenderer {
     
     Map<String, double> morph_weights = this.vmd.getMorphFrame(frame);
     if(this.pmx != null) {
-      SubArrayData sub_data = this.pmx.createSubPositionList(morph_weights);
-      this.position_buffer.setSubData(gl, sub_data);
+      this.pmx.createSubPositionList(morph_weights).forEach((SubArrayData sub_data){
+        this.position_buffer.setSubData(gl, sub_data);
+      });
     }
 
     //setup shader
