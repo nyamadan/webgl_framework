@@ -18,6 +18,17 @@ part 'vmd_parser.dart';
 part 'pmd_main_shader.dart';
 part 'pmd_edge_shader.dart';
 
+class VertMorphNode {
+  int vertex_index;
+  List data;
+}
+
+class MorphNode {
+  String name;
+  String english_name;
+  List data;
+}
+
 class IKNode {
   BoneNode bone;
   Vector3 min;
@@ -648,6 +659,12 @@ class MMD_Renderer extends WebGLRenderer {
     //this.bones.where((BoneNode bone) => bone.parent == null).forEach((BoneNode bone) => bone.update());
     this._writeBoneTexture(this.bones, this.bone_texture.data);
     this.bone_texture.refresh(gl);
+    
+    Map<String, double> morph_weights = this.vmd.getMorphFrame(frame);
+    if(this.pmx != null) {
+      SubArrayData sub_data = this.pmx.createSubPositionList(morph_weights);
+      this.position_buffer.setSubData(gl, sub_data);
+    }
 
     //setup shader
     gl.clearColor(0.5, 0.5, 0.5, 1.0);
