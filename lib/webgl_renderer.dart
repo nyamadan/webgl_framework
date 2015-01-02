@@ -14,7 +14,7 @@ abstract class WebGLRenderer
     this.dom.width = width;
     this.dom.height = height;
 
-    this.gl = this.dom.getContext3d();
+    this.gl = this.dom.getContext3d(antialias: true);
     if (this.gl == null) {
       throw(new Exception("Could not initialize WebGL context."));
     }
