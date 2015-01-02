@@ -81,7 +81,7 @@ class VMD_BoneMotion {
 
 class VMD_Animation {
   String name;
-  List<VMD_BoneMotion> bone_motions;
+  Map<String, List<VMD_BoneMotion>> bone_motions;
   List<VMD_MorphMotion> morph_motions;
 
   Future<VMD_Animation> load(String uri) {
@@ -139,15 +139,23 @@ class VMD_Animation {
     int length = view.getUint32(offset, Endianness.LITTLE_ENDIAN);
     offset += 4;
 
-    this.bone_motions = new List<VMD_BoneMotion>.generate(length, (int i){
+    this.bone_motions = new Map<String, List<VMD_BoneMotion>>();
+    for(int i = 0; i < length; i++) {
       VMD_BoneMotion bone_motion = new VMD_BoneMotion();
       offset = bone_motion.parse(buffer, view, offset);
-      return bone_motion;
-    });
+
+      if(!this.bone_motions.containsKey(bone_motion.name)) {
+        this.bone_motions[bone_motion.name] = new List<VMD_BoneMotion>();
+      }
+
+      this.bone_motions[bone_motion.name].add(bone_motion);
+    }
 
     // sort by frame
-    this.bone_motions.sort((VMD_BoneMotion frame1, VMD_BoneMotion frame2){
-      return frame1.frame - frame2.frame;
+    this.bone_motions.forEach((String key, List<VMD_BoneMotion> bone_motions){
+      bone_motions.sort((VMD_BoneMotion frame1, VMD_BoneMotion frame2){
+        return frame1.frame - frame2.frame;
+      });
     });
 
     return offset;
@@ -174,11 +182,14 @@ class VMD_Animation {
   List<VMD_BoneMotion> getFrame(String bone_name, int frame) {
     VMD_BoneMotion prev_frame = null;
     VMD_BoneMotion next_frame = null;
-    for(int i = 0; i < this.bone_motions.length; i++) {
-      VMD_BoneMotion bone_motion = this.bone_motions[i];
-      if(bone_name != bone_motion.name) {
-        continue;
-      }
+    if(!this.bone_motions.containsKey(bone_name)) {
+      return null;
+    }
+
+    List<VMD_BoneMotion> bone_motions = this.bone_motions[bone_name];
+
+    for(int i = 0; i < bone_motions.length; i++) {
+      VMD_BoneMotion bone_motion = bone_motions[i];
 
       if(bone_motion.frame < frame) {
         prev_frame = bone_motion;
