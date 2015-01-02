@@ -117,7 +117,6 @@ class VMD_Animation {
     offset = this._getModelName(buffer, view, offset);
     offset = this._getBoneMotions(buffer, view, offset);
     offset = this._getMorphMotions(buffer, view, offset);
-    print(this.morph_motions);
   }
 
   int _checkHeader(ByteBuffer buffer, ByteData view, int offset) {
