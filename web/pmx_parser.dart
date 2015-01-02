@@ -505,11 +505,11 @@ class PMX_Material {
     this.toon_mode = view.getUint8(offset);
     offset += 1;
 
-    if(toon_mode == 0) {
+    if(toon_mode == 1) {
       this.toon_index = view.getInt8(offset);
       offset += 1;
     }
-    if(toon_mode == 1) {
+    if(toon_mode == 0) {
       this.toon_index = _getPMXInt(view, offset, texture_index_size);
       offset += texture_index_size;
     }

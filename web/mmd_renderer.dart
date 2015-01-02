@@ -178,7 +178,7 @@ class MMD_Renderer extends WebGLRenderer {
   List<WebGLElementArrayBuffer32> index_buffer_list32;
 
   Map<String, WebGLCanvasTexture> textures;
-  Map<int, WebGLCanvasTexture> toon_textures;
+  List<WebGLCanvasTexture> toon_textures;
   WebGLCanvasTexture white_texture;
   WebGLCanvasTexture diffuse_texture;
   WebGLTypedDataTexture bone_texture;
@@ -235,12 +235,11 @@ class MMD_Renderer extends WebGLRenderer {
     ctx.putImageData(image_data, 0, 0);
     this.diffuse_texture.refresh(gl);
 
-    this.toon_textures = new Map<int, WebGLCanvasTexture>();
-    for(int i = 1; i <= 10; i++) {
+    this.toon_textures = new List<WebGLCanvasTexture>.generate(10, (int i){
       var texture = new WebGLCanvasTexture(gl, flip_y: true, color: new Vector4(1.0, 1.0, 1.0, 1.0));
-      texture.load(gl, "toon/toon${i.toString().padLeft(2, '0')}.bmp");
-      this.toon_textures[i] = texture;
-    }
+      texture.load(gl, "toon/toon${(i + 1).toString().padLeft(2, '0')}.bmp");
+      return texture;
+    });
 
     //this._loadPMD();
     this._loadPMX();
