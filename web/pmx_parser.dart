@@ -920,10 +920,7 @@ class PMX_Model {
       List<PMX_VertMorph> vert_morphs = morph.data;
       
       vert_morphs.forEach((PMX_VertMorph vert_morph) {
-        if(!position_map.containsKey(vert_morph.vertex_index)) {
-          position_map[vert_morph.vertex_index] = new Vector3.zero();
-        }
-        
+        position_map.putIfAbsent(vert_morph.vertex_index, () => new Vector3.zero());
         position_map[vert_morph.vertex_index] += vert_morph.offset * morph_weights[name];
       });
     });
@@ -956,9 +953,7 @@ class PMX_Model {
       for(int i = 0; i < v_length; i++) {
         int v_index = i + indices.first;
         Vector3 position = new Vector3.copy(this.vertices[v_index].position);
-        if(position_map.containsKey(v_index)) {
-          position += position_map[v_index];
-        }
+        position += position_map[v_index];
         position_list[i * 3 + 0] = position.x;
         position_list[i * 3 + 1] = position.y;
         position_list[i * 3 + 2] = position.z;
