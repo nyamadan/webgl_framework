@@ -110,6 +110,14 @@ abstract class WebGLRenderer
     }
   }
   
+  void setUniformTexture1(String key, GL.Texture texture) {
+    if (this.uniforms.containsKey(key)) {
+      gl.activeTexture(GL.TEXTURE1);
+      gl.bindTexture(GL.TEXTURE_2D, texture);
+      gl.uniform1i(this.uniforms[key], 1);
+    }
+  }
+  
   void setUniformMatrix4(String key, Matrix4 v) {
     if (this.uniforms.containsKey(key)) {
       gl.uniformMatrix4fv(this.uniforms[key], false, v.storage);
