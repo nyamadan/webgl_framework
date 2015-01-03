@@ -1,14 +1,16 @@
 library teapot_renderer;
 
+import "dart:typed_data";
 import "dart:web_gl" as GL;
 import "dart:math" as Math;
 import "package:vector_math/vector_math.dart";
 import "package:webgl_framework/webgl_framework.dart";
 import "teapot.dart" as teapot;
 
+part "copy_renderer.dart";
+
 class TeapotRenderer extends WebGLRenderer {
-  static const String VS =
-  """
+  static const String VS = """
   attribute vec3 position;
   attribute vec3 normal;
   attribute vec2 coord;
@@ -24,8 +26,7 @@ class TeapotRenderer extends WebGLRenderer {
   }
   """;
 
-  static const String FS =
-  """
+  static const String FS = """
   precision mediump float;
 
   uniform sampler2D texture;
@@ -42,14 +43,38 @@ class TeapotRenderer extends WebGLRenderer {
 
   GL.Program program;
 
-  Map<String, int> attributes;
-  Map<String, GL.UniformLocation> uniforms;
-
   WebGLArrayBuffer32 position_buffer;
   WebGLArrayBuffer32 normal_buffer;
   WebGLArrayBuffer32 coord_buffer;
   WebGLElementArrayBuffer16 index_buffer;
   WebGLCanvasTexture texture;
+  
+  GL.Framebuffer fbo;
+  GL.Renderbuffer depth_buffer;
+  GL.Texture color_buffer;
+
+  CopyRenderer copy_renderer;
+
+  void _initializeFBO() {
+    this.fbo = gl.createFramebuffer();
+    gl.bindFramebuffer(GL.FRAMEBUFFER, this.fbo);
+
+    this.depth_buffer = gl.createRenderbuffer();
+    gl.bindRenderbuffer(GL.RENDERBUFFER, this.depth_buffer);
+    gl.renderbufferStorage(GL.RENDERBUFFER, GL.DEPTH_COMPONENT16, this.dom.width, this.dom.height);
+    gl.framebufferRenderbuffer(GL.FRAMEBUFFER, GL.DEPTH_ATTACHMENT, GL.RENDERBUFFER, this.depth_buffer);
+
+    this.color_buffer = gl.createTexture();
+    gl.bindTexture(GL.TEXTURE_2D, this.color_buffer);
+    gl.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA, this.dom.width, this.dom.height, 0, GL.RGBA, GL.UNSIGNED_BYTE, null);
+    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.LINEAR);
+    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.LINEAR);
+    gl.framebufferTexture2D(GL.FRAMEBUFFER, GL.COLOR_ATTACHMENT0, GL.TEXTURE_2D, this.color_buffer, 0);
+
+    gl.bindTexture(GL.TEXTURE_2D, null);
+    gl.bindRenderbuffer(GL.RENDERBUFFER, null);
+    gl.bindFramebuffer(GL.FRAMEBUFFER, null);
+  }
 
   void _initialize() {
     var vs = this.compileVertexShader(VS);
@@ -58,51 +83,23 @@ class TeapotRenderer extends WebGLRenderer {
     gl.deleteShader(vs);
     gl.deleteShader(fs);
 
-    this.attributes = this.getAttributes(this.program, [
-      "position",
-      "normal",
-      "coord",
-    ]);
-    this.uniforms = this.getUniformLocations(this.program, [
-      "mvp_matrix",
-      "texture",
-    ]);
+    this.attributes = this.getAttributes(this.program, ["position", "normal", "coord",]);
+    this.uniforms = this.getUniformLocations(this.program, ["mvp_matrix", "texture",]);
 
     this.position_buffer = new WebGLArrayBuffer32(gl, teapot.positions);
     this.normal_buffer = new WebGLArrayBuffer32(gl, teapot.normals);
     this.coord_buffer = new WebGLArrayBuffer32(gl, teapot.coords);
     this.index_buffer = new WebGLElementArrayBuffer16(gl, teapot.indices);
 
-    gl.enable(GL.DEPTH_TEST);
-    gl.clearColor(0.5, 0.5, 0.5, 1.0);
-    gl.useProgram(this.program);
-
-    if (this.attributes.containsKey("position")) {
-      gl.enableVertexAttribArray(this.attributes["position"]);
-      gl.bindBuffer(GL.ARRAY_BUFFER, this.position_buffer.buffer);
-      gl.vertexAttribPointer(this.attributes["position"], 3, GL.FLOAT, false, 0, 0);
-    }
-
-    if (this.attributes.containsKey("normal")) {
-      gl.enableVertexAttribArray(this.attributes["normal"]);
-      gl.bindBuffer(GL.ARRAY_BUFFER, this.normal_buffer.buffer);
-      gl.vertexAttribPointer(this.attributes["normal"], 3, GL.FLOAT, false, 0, 0);
-    }
-
-    if (this.attributes.containsKey("coord")) {
-      gl.enableVertexAttribArray(this.attributes["coord"]);
-      gl.bindBuffer(GL.ARRAY_BUFFER, this.coord_buffer.buffer);
-      gl.vertexAttribPointer(this.attributes["coord"], 2, GL.FLOAT, false, 0, 0);
-    }
-
     this.texture = new WebGLCanvasTexture(gl, flip_y: true);
     this.texture.load(gl, "pattern.png");
 
-    gl.activeTexture(GL.TEXTURE0);
+    this._initializeFBO();
+
+    this.copy_renderer = new CopyRenderer.copy(this);
   }
 
-  TeapotRenderer(int width, int height)
-  {
+  TeapotRenderer(int width, int height) {
     this.initContext(width, height);
     this.initTrackball();
 
@@ -129,18 +126,24 @@ class TeapotRenderer extends WebGLRenderer {
 
     Matrix4 mvp = projection * view * model;
 
-    if (this.uniforms.containsKey("texture")) {
-      gl.bindTexture(GL.TEXTURE_2D, this.texture.texture);
-      gl.uniform1i(this.uniforms["texture"], 0);
-    }
+    gl.bindFramebuffer(GL.FRAMEBUFFER, this.fbo);
+    gl.viewport(0, 0, this.dom.width, this.dom.height);
+    gl.useProgram(this.program);
+    gl.enable(GL.DEPTH_TEST);
+    gl.clearColor(0.5, 0.5, 0.5, 1.0);
 
-    if (this.uniforms.containsKey("mvp_matrix")) {
-      gl.uniformMatrix4fv(this.uniforms["mvp_matrix"], false, mvp.storage);
-    }
+    this.setUniformTexture0("texture", this.texture.texture);
+    this.setUniformMatrix4("mvp_matrix", mvp);
+    this.setAttributeFloat3("position", position_buffer.buffer);
+    this.setAttributeFloat3("normal", normal_buffer.buffer);
+    this.setAttributeFloat2("coord", coord_buffer.buffer);
 
     gl.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
     gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, this.index_buffer.buffer);
     gl.drawElements(GL.TRIANGLES, this.index_buffer.data.length, GL.UNSIGNED_SHORT, 0);
+
+    gl.bindFramebuffer(GL.FRAMEBUFFER, null);
+    this.copy_renderer.texture_buffer = this.color_buffer;
+    this.copy_renderer.render(ms);
   }
 }
-
