@@ -78,7 +78,7 @@ class TeapotRenderer extends WebGLRenderer {
 
     this.color_buffer = gl.createTexture();
     gl.bindTexture(GL.TEXTURE_2D, this.color_buffer);
-    gl.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA, this.dom.width, this.dom.height, 0, GL.RGBA, GL.UNSIGNED_BYTE, null);
+    gl.texImage2DTyped(GL.TEXTURE_2D, 0, GL.RGBA, this.dom.width, this.dom.height, 0, GL.RGBA, GL.UNSIGNED_BYTE, null);
     gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.LINEAR);
     gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.LINEAR);
     gl.framebufferTexture2D(GL.FRAMEBUFFER, GL.COLOR_ATTACHMENT0, GL.TEXTURE_2D, this.color_buffer, 0);
@@ -86,10 +86,6 @@ class TeapotRenderer extends WebGLRenderer {
     gl.bindTexture(GL.TEXTURE_2D, null);
     gl.bindRenderbuffer(GL.RENDERBUFFER, null);
     gl.bindFramebuffer(GL.FRAMEBUFFER, null);
-
-    int data_length = 4 * this.dom.width * this.dom.height;
-    Float32List zero_data = new Float32List(data_length);
-    zero_data.fillRange(0, data_length, 0.0);
     
     this.fbo_list = new List<GL.Framebuffer>(2);
     this.texture_list = new List<GL.Texture>(2);
@@ -99,7 +95,7 @@ class TeapotRenderer extends WebGLRenderer {
 
       this.texture_list[i] = gl.createTexture();
       gl.bindTexture(GL.TEXTURE_2D, this.texture_list[i]);
-      gl.texImage2DTyped(GL.TEXTURE_2D, 0, GL.RGBA, this.dom.width, this.dom.height, 0, GL.RGBA, GL.FLOAT, zero_data);
+      gl.texImage2DTyped(GL.TEXTURE_2D, 0, GL.RGBA, this.dom.width, this.dom.height, 0, GL.RGBA, GL.FLOAT, null);
       gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.LINEAR);
       gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.LINEAR);
       gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE); 
