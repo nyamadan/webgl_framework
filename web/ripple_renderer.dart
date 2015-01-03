@@ -4,10 +4,10 @@ class RippleRenderer extends WebGLRenderer {
   static const String VS =
   """
   attribute vec3 position;
-  varying vec2 v_coord;
+  varying vec2 coord;
 
   void main(void){
-    v_coord = position.xy * 0.5 + 0.5;
+    coord = position.xy * 0.5 + 0.5;
     gl_Position = vec4(position, 1.0);
   }
   """;
@@ -18,11 +18,14 @@ class RippleRenderer extends WebGLRenderer {
 
   uniform vec2 half_pixel;
   uniform sampler2D texture;
+  uniform sampler2D ripple;
+  uniform float perturbance;
 
-  varying vec2 v_coord;
+  varying vec2 coord;
 
   void main(void){
-    vec4 color = texture2D(texture, v_coord);
+    vec2 offset = texture2D(ripple, coord).ba;
+    vec4 color = texture2D(texture, coord + offset * perturbance);
     gl_FragColor = vec4(color.rgb, 1.0);
   }
   """;
@@ -31,6 +34,7 @@ class RippleRenderer extends WebGLRenderer {
   
   GL.Texture color_texture;
   GL.Texture ripple_texture;
+  double perturbance;
 
   WebGLArrayBuffer32 position_buffer;
   WebGLElementArrayBuffer16 index_buffer;
@@ -47,7 +51,8 @@ class RippleRenderer extends WebGLRenderer {
     ]);
     this.uniforms = this.getUniformLocations(this.program, [
       "texture",
-      "half_pixel",
+      "ripple",
+      "perturbance",
     ]);
 
     this.position_buffer = new WebGLArrayBuffer32(gl, new Float32List.fromList([
@@ -84,22 +89,11 @@ class RippleRenderer extends WebGLRenderer {
     
     gl.enable(GL.DEPTH_TEST);
     gl.clearColor(0.5, 0.5, 0.5, 1.0);
-
-    if (this.uniforms.containsKey("texture")) {
-      gl.activeTexture(GL.TEXTURE0);
-      gl.bindTexture(GL.TEXTURE_2D, this.color_texture);
-      gl.uniform1i(this.uniforms["texture"], 0);
-    }
     
-    if (this.uniforms.containsKey("half_pixel")) {
-      gl.uniform2f(this.uniforms["half_pixel"], 0.5 / this.dom.width, 0.5 / this.dom.height);
-    }
-
-    if (this.attributes.containsKey("position")) {
-      gl.enableVertexAttribArray(this.attributes["position"]);
-      gl.bindBuffer(GL.ARRAY_BUFFER, this.position_buffer.buffer);
-      gl.vertexAttribPointer(this.attributes["position"], 3, GL.FLOAT, false, 0, 0);
-    }
+    this.setUniformTexture0("texture", this.color_texture);
+    this.setUniformTexture1("ripple", this.ripple_texture);
+    this.setUniformFloat("perturbance", this.perturbance != null ? this.perturbance : 0.04);
+    this.setAttributeFloat3("position", this.position_buffer.buffer);
 
     gl.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
     gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, this.index_buffer.buffer);

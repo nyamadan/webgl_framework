@@ -202,7 +202,7 @@ class TeapotRenderer extends WebGLRenderer {
     gl.drawElements(GL.TRIANGLES, this.index_buffer.data.length, GL.UNSIGNED_SHORT, 0);
     
     var r = new Math.Random();
-    if(r.nextDouble() < 0.005) {
+    if(r.nextDouble() < 0.1) {
       this.drop(new Vector2(r.nextDouble() * 2.0 - 1.0, r.nextDouble() * 2.0 - 1.0));
     }
 
@@ -217,11 +217,8 @@ class TeapotRenderer extends WebGLRenderer {
     this._swapFBO();
     
     gl.bindFramebuffer(GL.FRAMEBUFFER, null);
-    this.copy_renderer.texture_buffer = this.texture_list[1];
-    this.copy_renderer.render(ms);
-    
-//    this.ripple_renderer.color_texture = this.color_buffer;
-//    this.ripple_renderer.ripple_texture = this.texture_list[1];
-//    this.ripple_renderer.render(ms);
+    this.ripple_renderer.color_texture = this.color_buffer;
+    this.ripple_renderer.ripple_texture = this.texture_list[1];
+    this.ripple_renderer.render(ms);
   }
 }
