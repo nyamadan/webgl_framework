@@ -8,6 +8,8 @@ import "package:webgl_framework/webgl_framework.dart";
 import "teapot.dart" as teapot;
 
 part "copy_renderer.dart";
+part "drop_renderer.dart";
+part "ripple_renderer.dart";
 
 class TeapotRenderer extends WebGLRenderer {
   static const String VS = """
@@ -54,6 +56,12 @@ class TeapotRenderer extends WebGLRenderer {
   GL.Texture color_buffer;
 
   CopyRenderer copy_renderer;
+  
+  RippleRenderer ripple_renderer;
+  DropRenderer drop_renderer;
+
+  List<GL.Framebuffer> fbo_list;
+  List<GL.Texture> texture_list;
 
   void _initializeFBO() {
     this.fbo = gl.createFramebuffer();
@@ -74,6 +82,37 @@ class TeapotRenderer extends WebGLRenderer {
     gl.bindTexture(GL.TEXTURE_2D, null);
     gl.bindRenderbuffer(GL.RENDERBUFFER, null);
     gl.bindFramebuffer(GL.FRAMEBUFFER, null);
+
+    int data_length = 4 * this.dom.width * this.dom.height;
+    Float32List zero_data = new Float32List(data_length);
+    zero_data.fillRange(0, data_length, 0.0);
+    
+    this.fbo_list = new List<GL.Framebuffer>(2);
+    this.texture_list = new List<GL.Texture>(2);
+    for (int i = 0; i < 2; i++) {
+      this.fbo_list[i] = gl.createFramebuffer();
+      gl.bindFramebuffer(GL.FRAMEBUFFER, this.fbo_list[i]);
+
+      this.texture_list[i] = gl.createTexture();
+      gl.bindTexture(GL.TEXTURE_2D, this.texture_list[i]);
+      gl.texImage2DTyped(GL.TEXTURE_2D, 0, GL.RGBA, this.dom.width, this.dom.height, 0, GL.RGBA, GL.FLOAT, zero_data);
+      gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.LINEAR);
+      gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.LINEAR);
+      gl.framebufferTexture2D(GL.FRAMEBUFFER, GL.COLOR_ATTACHMENT0, GL.TEXTURE_2D, this.texture_list[i], 0);
+
+      gl.bindTexture(GL.TEXTURE_2D, null);
+      gl.bindFramebuffer(GL.FRAMEBUFFER, null);
+    }
+  }
+  
+  void _swapFBO() {
+    GL.Texture temp_texture = this.texture_list[0];
+    this.texture_list[0] = this.texture_list[1];
+    this.texture_list[1] = temp_texture;
+    
+    GL.Framebuffer temp_fbo = this.fbo_list[0];
+    this.fbo_list[0] = this.fbo_list[1];
+    this.fbo_list[1] = temp_fbo;
   }
 
   void _initialize() {
@@ -97,12 +136,16 @@ class TeapotRenderer extends WebGLRenderer {
     this._initializeFBO();
 
     this.copy_renderer = new CopyRenderer.copy(this);
+    this.drop_renderer = new DropRenderer.copy(this);
+    this.ripple_renderer = new RippleRenderer.copy(this);
   }
 
   TeapotRenderer(int width, int height) {
     this.initContext(width, height);
     this.initTrackball();
 
+    gl.getExtension('OES_texture_float');
+    gl.getExtension('OES_texture_float_linear');
     this._initialize();
   }
 
@@ -142,8 +185,14 @@ class TeapotRenderer extends WebGLRenderer {
     gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, this.index_buffer.buffer);
     gl.drawElements(GL.TRIANGLES, this.index_buffer.data.length, GL.UNSIGNED_SHORT, 0);
 
+    gl.bindFramebuffer(GL.FRAMEBUFFER, this.fbo_list[0]);
+    this.drop_renderer.ripple_texture = this.texture_list[1];
+    this.drop_renderer.render(ms);
+    this._swapFBO();
+    
     gl.bindFramebuffer(GL.FRAMEBUFFER, null);
-    this.copy_renderer.texture_buffer = this.color_buffer;
-    this.copy_renderer.render(ms);
+    this.ripple_renderer.color_texture = this.color_buffer;
+    this.ripple_renderer.ripple_texture = this.texture_list[1];
+    this.ripple_renderer.render(ms);
   }
 }
