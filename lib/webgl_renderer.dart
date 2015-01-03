@@ -8,6 +8,8 @@ abstract class WebGLRenderer
   _Trackball trackball;
 
   GL.RenderingContext gl;
+  Map<String, int> attributes;
+  Map<String, GL.UniformLocation> uniforms;
   void initContext(int width, int height)
   {
     this.dom = document.createElement("canvas");
@@ -81,11 +83,51 @@ abstract class WebGLRenderer
     names.forEach((String name) {
       int attribute = gl.getAttribLocation(program, name);
       if(attribute >= 0) {
+        gl.enableVertexAttribArray(attribute);
         attributes[name] = attribute;
       }
     });
     return attributes;
   }
 
+  void setUniformVector2(String key, Vector2 v) {
+    if (this.uniforms.containsKey(key)) {
+      gl.uniform2fv(this.uniforms[key], v.storage);
+    }
+  }
+
+  void setUniformFloat(String key, double v) {
+    if (this.uniforms.containsKey(key)) {
+      gl.uniform1f(this.uniforms[key], v);
+    }
+  }
+  
+  void setUniformTexture0(String key, GL.Texture texture) {
+    if (this.uniforms.containsKey(key)) {
+      gl.activeTexture(GL.TEXTURE0);
+      gl.bindTexture(GL.TEXTURE_2D, texture);
+      gl.uniform1i(this.uniforms[key], 0);
+    }
+  }
+  
+  void setUniformMatrix4(String key, Matrix4 v) {
+    if (this.uniforms.containsKey(key)) {
+      gl.uniformMatrix4fv(this.uniforms[key], false, v.storage);
+    }
+  }
+  
+  void setAttributeFloat3(String key, GL.Buffer buffer) {
+    if (this.attributes.containsKey(key)) {
+      gl.bindBuffer(GL.ARRAY_BUFFER, buffer);
+      gl.vertexAttribPointer(this.attributes[key], 3, GL.FLOAT, false, 0, 0);
+    }
+  }
+  
+  void setAttributeFloat2(String key, GL.Buffer buffer) {
+    if (this.attributes.containsKey(key)) {
+      gl.bindBuffer(GL.ARRAY_BUFFER, buffer);
+      gl.vertexAttribPointer(this.attributes[key], 2, GL.FLOAT, false, 0, 0);
+    }
+  }
   void render(double ms);
 }
