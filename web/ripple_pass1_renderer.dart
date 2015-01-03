@@ -1,6 +1,6 @@
 part of teapot_renderer;
 
-class DropRenderer extends WebGLRenderer {
+class RipplePass1Renderer extends WebGLRenderer {
   static const String VS =
   """
   attribute vec3 position;
@@ -16,18 +16,28 @@ class DropRenderer extends WebGLRenderer {
   """
   precision mediump float;
 
-  const float PI = 3.141592653589793;
+  uniform vec2 delta;
   uniform sampler2D texture;
-  uniform vec2 center;
-  uniform float radius;
-  uniform float strength;
+
   varying vec2 coord;
 
   void main(void){
     vec4 info = texture2D(texture, coord);
-    float drop = max(0.0, 1.0 - length(center * 0.5 + 0.5 - coord) / radius);
-    drop = 0.5 - cos(drop * PI) * 0.5;
-    info.r += drop * strength;
+
+    vec2 dx = vec2(delta.x, 0.0);
+    vec2 dy = vec2(0.0, delta.y);
+
+    float average = (
+      texture2D(texture, coord - dx).r +
+      texture2D(texture, coord - dy).r +
+      texture2D(texture, coord + dx).r +
+      texture2D(texture, coord + dy).r
+    ) * 0.25;
+
+    info.g += (average - info.r) * 2.0;
+    info.g *= 0.995;
+    info.r += info.g;
+
     gl_FragColor = info;
   }
   """;
@@ -35,10 +45,9 @@ class DropRenderer extends WebGLRenderer {
   GL.Program program;
   
   GL.Texture ripple_texture;
-  
-  Vector2 center;
-  double radius;
-  double strength;
+
+  Map<String, int> attributes;
+  Map<String, GL.UniformLocation> uniforms;
 
   WebGLArrayBuffer32 position_buffer;
   WebGLElementArrayBuffer16 index_buffer;
@@ -55,9 +64,7 @@ class DropRenderer extends WebGLRenderer {
     ]);
     this.uniforms = this.getUniformLocations(this.program, [
       "texture",
-      "center",
-      "strength",
-      "radius",
+      "delta",
     ]);
 
     this.position_buffer = new WebGLArrayBuffer32(gl, new Float32List.fromList([
@@ -73,7 +80,7 @@ class DropRenderer extends WebGLRenderer {
     ]));
   }
 
-  DropRenderer(int width, int height)
+  RipplePass1Renderer(int width, int height)
   {
     this.initContext(width, height);
     this.initTrackball();
@@ -81,13 +88,13 @@ class DropRenderer extends WebGLRenderer {
     this._initialize();
   }
 
-  DropRenderer.copy(WebGLRenderer src) {
+  RipplePass1Renderer.copy(WebGLRenderer src) {
     this.gl = src.gl;
     this.dom = src.dom;
 
     this._initialize();
   }
-  
+
   void render(double ms) {
     gl.viewport(0, 0, this.dom.width, this.dom.height);
     gl.useProgram(this.program);
@@ -96,9 +103,7 @@ class DropRenderer extends WebGLRenderer {
     gl.clearColor(0.5, 0.5, 0.5, 1.0);
 
     this.setUniformTexture0("texture", this.ripple_texture);
-    this.setUniformVector2("center", this.center != null ? this.center : new Vector2.zero());
-    this.setUniformFloat("radius", this.radius != null ? this.radius : 0.125);
-    this.setUniformFloat("strength", this.strength != null ? this.strength : 0.05);
+    this.setUniformVector2("delta", new Vector2(1.0 / this.dom.width, 1.0 / this.dom.height));
     this.setAttributeFloat3("position", this.position_buffer.buffer);
 
     gl.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
@@ -106,4 +111,3 @@ class DropRenderer extends WebGLRenderer {
     gl.drawElements(GL.TRIANGLES, this.index_buffer.data.length, GL.UNSIGNED_SHORT, 0);
   }
 }
-
