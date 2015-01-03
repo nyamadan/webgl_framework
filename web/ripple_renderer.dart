@@ -24,9 +24,10 @@ class RippleRenderer extends WebGLRenderer {
   varying vec2 coord;
 
   void main(void){
-    vec2 offset = texture2D(ripple, coord).ba;
+    vec2 offset = -texture2D(ripple, coord).ba;
+    float specular = pow(max(0.0, dot(offset, normalize(vec2(-0.6, 1.0)))), 4.0);
     vec4 color = texture2D(texture, coord + offset * perturbance);
-    gl_FragColor = vec4(color.rgb, 1.0);
+    gl_FragColor = vec4(color.rgb + specular, 1.0);
   }
   """;
 
