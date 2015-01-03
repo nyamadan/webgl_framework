@@ -43,9 +43,6 @@ class TeapotRenderer extends WebGLRenderer {
 
   GL.Program program;
 
-  Map<String, int> attributes;
-  Map<String, GL.UniformLocation> uniforms;
-
   WebGLArrayBuffer32 position_buffer;
   WebGLArrayBuffer32 normal_buffer;
   WebGLArrayBuffer32 coord_buffer;
@@ -135,33 +132,11 @@ class TeapotRenderer extends WebGLRenderer {
     gl.enable(GL.DEPTH_TEST);
     gl.clearColor(0.5, 0.5, 0.5, 1.0);
 
-    if (this.uniforms.containsKey("texture")) {
-      gl.activeTexture(GL.TEXTURE0);
-      gl.bindTexture(GL.TEXTURE_2D, this.texture.texture);
-      gl.uniform1i(this.uniforms["texture"], 0);
-    }
-
-    if (this.uniforms.containsKey("mvp_matrix")) {
-      gl.uniformMatrix4fv(this.uniforms["mvp_matrix"], false, mvp.storage);
-    }
-
-    if (this.attributes.containsKey("position")) {
-      gl.enableVertexAttribArray(this.attributes["position"]);
-      gl.bindBuffer(GL.ARRAY_BUFFER, this.position_buffer.buffer);
-      gl.vertexAttribPointer(this.attributes["position"], 3, GL.FLOAT, false, 0, 0);
-    }
-
-    if (this.attributes.containsKey("normal")) {
-      gl.enableVertexAttribArray(this.attributes["normal"]);
-      gl.bindBuffer(GL.ARRAY_BUFFER, this.normal_buffer.buffer);
-      gl.vertexAttribPointer(this.attributes["normal"], 3, GL.FLOAT, false, 0, 0);
-    }
-
-    if (this.attributes.containsKey("coord")) {
-      gl.enableVertexAttribArray(this.attributes["coord"]);
-      gl.bindBuffer(GL.ARRAY_BUFFER, this.coord_buffer.buffer);
-      gl.vertexAttribPointer(this.attributes["coord"], 2, GL.FLOAT, false, 0, 0);
-    }
+    this.setUniformTexture0("texture", this.texture.texture);
+    this.setUniformMatrix4("mvp_matrix", mvp);
+    this.setAttributeFloat3("position", position_buffer.buffer);
+    this.setAttributeFloat3("normal", normal_buffer.buffer);
+    this.setAttributeFloat2("coord", coord_buffer.buffer);
 
     gl.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
     gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, this.index_buffer.buffer);
