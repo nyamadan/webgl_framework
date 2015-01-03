@@ -58,6 +58,27 @@ class TeapotRenderer extends WebGLRenderer {
 
   CopyRenderer copy_renderer;
 
+  void _initializeFBO() {
+    this.fbo = gl.createFramebuffer();
+    gl.bindFramebuffer(GL.FRAMEBUFFER, this.fbo);
+
+    this.depth_buffer = gl.createRenderbuffer();
+    gl.bindRenderbuffer(GL.RENDERBUFFER, this.depth_buffer);
+    gl.renderbufferStorage(GL.RENDERBUFFER, GL.DEPTH_COMPONENT16, this.dom.width, this.dom.height);
+    gl.framebufferRenderbuffer(GL.FRAMEBUFFER, GL.DEPTH_ATTACHMENT, GL.RENDERBUFFER, this.depth_buffer);
+
+    this.color_buffer = gl.createTexture();
+    gl.bindTexture(GL.TEXTURE_2D, this.color_buffer);
+    gl.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA, this.dom.width, this.dom.height, 0, GL.RGBA, GL.UNSIGNED_BYTE, null);
+    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.LINEAR);
+    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.LINEAR);
+    gl.framebufferTexture2D(GL.FRAMEBUFFER, GL.COLOR_ATTACHMENT0, GL.TEXTURE_2D, this.color_buffer, 0);
+
+    gl.bindTexture(GL.TEXTURE_2D, null);
+    gl.bindRenderbuffer(GL.RENDERBUFFER, null);
+    gl.bindFramebuffer(GL.FRAMEBUFFER, null);
+  }
+
   void _initialize() {
     var vs = this.compileVertexShader(VS);
     var fs = this.compileFragmentShader(FS);
@@ -76,25 +97,8 @@ class TeapotRenderer extends WebGLRenderer {
     this.texture = new WebGLCanvasTexture(gl, flip_y: true);
     this.texture.load(gl, "pattern.png");
 
-    this.fbo = gl.createFramebuffer();
-    gl.bindFramebuffer(GL.FRAMEBUFFER, this.fbo);
-    
-    this.depth_buffer = gl.createRenderbuffer();
-    gl.bindRenderbuffer(GL.RENDERBUFFER, this.depth_buffer);
-    gl.renderbufferStorage(GL.RENDERBUFFER, GL.DEPTH_COMPONENT16, this.dom.width, this.dom.height);
-    gl.framebufferRenderbuffer(GL.FRAMEBUFFER, GL.DEPTH_ATTACHMENT, GL.RENDERBUFFER, this.depth_buffer);
+    this._initializeFBO();
 
-    this.color_buffer = gl.createTexture();
-    gl.bindTexture(GL.TEXTURE_2D, this.color_buffer);
-    gl.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA, this.dom.width, this.dom.height, 0, GL.RGBA, GL.UNSIGNED_BYTE, null);
-    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.LINEAR);
-    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.LINEAR);
-    gl.framebufferTexture2D(GL.FRAMEBUFFER, GL.COLOR_ATTACHMENT0, GL.TEXTURE_2D, this.color_buffer, 0);
-    
-    gl.bindTexture(GL.TEXTURE_2D, null);
-    gl.bindRenderbuffer(GL.RENDERBUFFER, null);
-    gl.bindFramebuffer(GL.FRAMEBUFFER, null);
-    
     this.copy_renderer = new CopyRenderer.copy(this);
   }
 

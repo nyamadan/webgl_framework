@@ -81,11 +81,11 @@ class CopyRenderer extends WebGLRenderer {
   }
 
   void render(double ms) {
+    gl.viewport(0, 0, this.dom.width, this.dom.height);
     gl.useProgram(this.program);
-
+    
     gl.enable(GL.DEPTH_TEST);
     gl.clearColor(0.5, 0.5, 0.5, 1.0);
-    gl.useProgram(this.program);
 
     if (this.uniforms.containsKey("texture")) {
       gl.activeTexture(GL.TEXTURE0);
