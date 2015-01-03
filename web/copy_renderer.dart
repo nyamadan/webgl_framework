@@ -87,21 +87,9 @@ class CopyRenderer extends WebGLRenderer {
     gl.enable(GL.DEPTH_TEST);
     gl.clearColor(0.5, 0.5, 0.5, 1.0);
 
-    if (this.uniforms.containsKey("texture")) {
-      gl.activeTexture(GL.TEXTURE0);
-      gl.bindTexture(GL.TEXTURE_2D, this.texture_buffer);
-      gl.uniform1i(this.uniforms["texture"], 0);
-    }
-    
-    if (this.uniforms.containsKey("half_pixel")) {
-      gl.uniform2f(this.uniforms["half_pixel"], 0.5 / this.dom.width, 0.5 / this.dom.height);
-    }
-
-    if (this.attributes.containsKey("position")) {
-      gl.enableVertexAttribArray(this.attributes["position"]);
-      gl.bindBuffer(GL.ARRAY_BUFFER, this.position_buffer.buffer);
-      gl.vertexAttribPointer(this.attributes["position"], 3, GL.FLOAT, false, 0, 0);
-    }
+    this.setUniformTexture0("texture", this.texture_buffer);
+    this.setUniformVector2("half_pixel", new Vector2(0.5 / this.dom.width, 0.5 / this.dom.height));
+    this.setAttributeFloat3("position", this.position_buffer.buffer);
 
     gl.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
     gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, this.index_buffer.buffer);
