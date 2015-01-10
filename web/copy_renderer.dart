@@ -1,4 +1,9 @@
-part of teapot_renderer;
+library copy_renderer;
+
+import "dart:typed_data";
+import "dart:web_gl" as GL;
+import "package:vector_math/vector_math.dart";
+import "package:webgl_framework/webgl_framework.dart";
 
 class CopyRenderer extends WebGLRenderer {
   static const String VS =

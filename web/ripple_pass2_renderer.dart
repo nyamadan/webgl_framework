@@ -1,4 +1,4 @@
-part of teapot_renderer;
+part of ripple_renderer;
 
 class RipplePass2Renderer extends WebGLRenderer {
   static const String VS =

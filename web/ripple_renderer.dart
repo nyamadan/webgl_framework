@@ -1,5 +1,16 @@
-part of teapot_renderer;
+library ripple_renderer;
 
+import "package:webgl_framework/webgl_framework.dart";
+
+import "dart:typed_data";
+import "dart:web_gl" as GL;
+import "package:vector_math/vector_math.dart";
+
+part "drop_renderer.dart";
+part "ripple_pass1_renderer.dart";
+part "ripple_pass2_renderer.dart";
+
+// ref: https://github.com/sirxemic/jquery.ripples/
 class RippleRenderer extends WebGLRenderer {
   static const String VS =
   """

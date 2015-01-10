@@ -1,17 +1,13 @@
 library teapot_renderer;
 
-import "dart:typed_data";
 import "dart:web_gl" as GL;
 import "dart:math" as Math;
 import "package:vector_math/vector_math.dart";
 import "package:webgl_framework/webgl_framework.dart";
 import "teapot.dart" as teapot;
 
-part "copy_renderer.dart";
-part "drop_renderer.dart";
-part "ripple_pass1_renderer.dart";
-part "ripple_pass2_renderer.dart";
-part "ripple_renderer.dart";
+import "ripple_renderer.dart";
+import "copy_renderer.dart";
 
 class TeapotRenderer extends WebGLRenderer {
   static const String VS = """
