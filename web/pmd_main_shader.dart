@@ -155,6 +155,7 @@ class PMD_MainShader extends WebGLRenderer {
   {
     gl.enable(GL.DEPTH_TEST);
     gl.depthFunc(GL.LEQUAL);
+    gl.enable(GL.BLEND);
     gl.blendFunc(GL.SRC_ALPHA, GL.ONE_MINUS_SRC_ALPHA);
 
     gl.disable(GL.CULL_FACE);

@@ -11,12 +11,15 @@ import "package:vector_math/vector_math.dart";
 import "package:logging/logging.dart";
 
 import "sjis_to_string.dart";
+import "copy_renderer.dart";
 
 part 'pmd_parser.dart';
 part 'pmx_parser.dart';
 part 'vmd_parser.dart';
 part 'pmd_main_shader.dart';
 part 'pmd_edge_shader.dart';
+
+part 'pmd_deferred_shader.dart';
 
 class VertMorphNode {
   int vertex_index;
@@ -34,11 +37,8 @@ class IKNode {
   Vector3 min;
   Vector3 max;
 
-  String toString() => ["{",[
-    "bone : ${this.bone}",
-    "max : ${this.max}",
-    "min : ${this.min}",
-  ].join(", "),"}"].join("");
+  String toString() =>
+      ["{", ["bone : ${this.bone}", "max : ${this.max}", "min : ${this.min}",].join(", "), "}"].join("");
 }
 
 class BoneNode {
@@ -76,13 +76,13 @@ class BoneNode {
     this.euler_angle = new Vector3.zero();
 
     List<VMD_BoneMotion> motions = vmd.getFrame(this.name, frame);
-    if(motions != null) {
+    if (motions != null) {
       VMD_BoneMotion prev_frame = motions[0];
       VMD_BoneMotion next_frame = motions[1];
-      if(prev_frame == null && next_frame != null) {
+      if (prev_frame == null && next_frame != null) {
         next_frame.rotation.copyTo(this.rotation);
         next_frame.location.copyInto(this.position);
-      } else if(prev_frame != null && next_frame == null) {
+      } else if (prev_frame != null && next_frame == null) {
         prev_frame.rotation.copyTo(this.rotation);
         prev_frame.location.copyInto(this.position);
       } else {
@@ -94,7 +94,7 @@ class BoneNode {
     }
   }
 
-  void update({bool recursive : true}) {
+  void update({bool recursive: true}) {
     Matrix4 scale_matrix = new Matrix4.identity();
     scale_matrix.scale(this.scale);
 
@@ -105,7 +105,7 @@ class BoneNode {
     translate_matrix.setTranslation(this.position);
 
     this.relative_transform = translate_matrix * rotation_matrix * scale_matrix;
-    if(this.parent != null) {
+    if (this.parent != null) {
       this.relative_transform = this.parent.relative_transform * this.relative_transform;
     }
 
@@ -114,37 +114,40 @@ class BoneNode {
 
     this.absolute_transform = bone_translate_matrix * translate_matrix * rotation_matrix * scale_matrix;
     this.absolute_rotation = new Quaternion.copy(this.rotation);
-    if(this.parent != null) {
+    if (this.parent != null) {
       this.absolute_transform = this.parent.absolute_transform * this.absolute_transform;
       this.absolute_rotation = this.parent.absolute_rotation * this.absolute_rotation;
     }
 
     this.absolute_bone_position = new Vector3.copy(this.absolute_transform.getColumn(3).xyz);
 
-    if(recursive) {
+    if (recursive) {
       this.children.forEach((BoneNode bone) {
         bone.update(recursive: true);
       });
     }
   }
 
-  String toString() => ["{",[
-    "parent : ${this.parent != null ? this.parent.name : null }",
-    "name : ${this.name}",
-    "bone_type : ${this.bone_type}",
-    "relative_bone_position : ${this.relative_bone_position}",
-    "transformed_bone_position : ${this.absolute_bone_position}",
-    "original_bone_position : ${this.original_bone_position}",
-    "position : ${this.position}",
-    "scale : ${this.scale}",
-    "rotation : ${this.rotation}",
-    "absolute_transform : ${this.absolute_transform}",
-    "relative_transform : ${this.relative_transform}",
-    "children : ${this.children != null ? '...' : null}",
-    "ik_parent_transform : ${this.ik_parent_transform != null ? this.ik_parent_transform.name : null }",
-    "ik_parent_transform_weight : ${this.ik_parent_transform_weight}",
-    "iks : ${this.iks != null ? '...' : null}",
-  ].join(", "),"}"].join("");
+  String toString() =>
+      [
+          "{",
+          [
+              "parent : ${this.parent != null ? this.parent.name : null }",
+              "name : ${this.name}",
+              "bone_type : ${this.bone_type}",
+              "relative_bone_position : ${this.relative_bone_position}",
+              "transformed_bone_position : ${this.absolute_bone_position}",
+              "original_bone_position : ${this.original_bone_position}",
+              "position : ${this.position}",
+              "scale : ${this.scale}",
+              "rotation : ${this.rotation}",
+              "absolute_transform : ${this.absolute_transform}",
+              "relative_transform : ${this.relative_transform}",
+              "children : ${this.children != null ? '...' : null}",
+              "ik_parent_transform : ${this.ik_parent_transform != null ? this.ik_parent_transform.name : null }",
+              "ik_parent_transform_weight : ${this.ik_parent_transform_weight}",
+              "iks : ${this.iks != null ? '...' : null}",].join(", "),
+          "}"].join("");
 }
 
 class MaterialNode {
@@ -185,6 +188,12 @@ class MMD_Mesh {
 class MMD_Renderer extends WebGLRenderer {
   final Logger log = new Logger("MMD_Renderer");
 
+  bool enable_edge_shader = true;
+  bool enable_deferred_shader = true;
+  bool play = true;
+
+  WebGLFBO fbo;
+
   List<WebGLCanvasTexture> toon_textures;
   WebGLCanvasTexture white_texture;
   WebGLCanvasTexture diffuse_texture;
@@ -192,15 +201,16 @@ class MMD_Renderer extends WebGLRenderer {
   PMD_Model pmd;
   PMX_Model pmx;
   VMD_Animation vmd;
-  
+
   MMD_Mesh mesh;
 
   DebugParticleShader debug_particle_shader;
   DebugAxisShader debug_axis_shader;
+  CopyRenderer copy_renderer;
   PMD_MainShader main_shader;
+  PMD_DeferredShader deferred_shader;
   PMD_EdgeShader edge_shader;
 
-  bool play = true;
   int frame;
   double start;
 
@@ -208,6 +218,7 @@ class MMD_Renderer extends WebGLRenderer {
     gl.getExtension("OES_texture_float");
     gl.getExtension("OES_texture_float_linear");
     gl.getExtension("OES_element_index_uint");
+    gl.getExtension("WEBGL_depth_texture");
 
     this.debug_particle_shader = new DebugParticleShader(this.dom.width, this.dom.height);
 
@@ -218,18 +229,21 @@ class MMD_Renderer extends WebGLRenderer {
 
     this.main_shader = new PMD_MainShader.copy(this);
     this.edge_shader = new PMD_EdgeShader.copy(this);
+    this.copy_renderer = new CopyRenderer.copy(this);
 
-    this.white_texture = new WebGLCanvasTexture(gl,
-      width : 16, height : 16,
-      color : new Vector4(1.0, 1.0, 1.0, 1.0)
-    );
+    if (this.enable_deferred_shader) {
+      GL.DrawBuffers glext = gl.getExtension("WEBGL_draw_buffers");
+      this.deferred_shader = new PMD_DeferredShader.copy(this, glext);
+    }
 
-    this.diffuse_texture = new WebGLCanvasTexture(gl, flip_y: true, width : 16, height : 16);
+    this.fbo = new WebGLFBO(gl, width: this.dom.width, height: this.dom.height, depth_buffer_enabled: true);
+    this.white_texture = new WebGLCanvasTexture(gl, width: 16, height: 16, color: new Vector4(1.0, 1.0, 1.0, 1.0));
+    this.diffuse_texture = new WebGLCanvasTexture(gl, flip_y: true, width: 16, height: 16);
     CanvasRenderingContext2D ctx = this.diffuse_texture.ctx;
     var image_data = ctx.getImageData(0, 0, 16, 16);
-    for(int y = 0; y < 16; y++) {
+    for (int y = 0; y < 16; y++) {
       int color = 255 - (y * 255 / 15).round();
-      for(int x = 0; x < 16; x++) {
+      for (int x = 0; x < 16; x++) {
         int offset = (y * 16 + x) * 4;
         image_data.data[offset + 0] = color;
         image_data.data[offset + 1] = color;
@@ -240,51 +254,68 @@ class MMD_Renderer extends WebGLRenderer {
     ctx.putImageData(image_data, 0, 0);
     this.diffuse_texture.refresh(gl);
 
-    this.toon_textures = new List<WebGLCanvasTexture>.generate(10, (int i){
+    this.toon_textures = new List<WebGLCanvasTexture>.generate(10, (int i) {
       var texture = new WebGLCanvasTexture(gl, flip_y: true, color: new Vector4(1.0, 1.0, 1.0, 1.0));
       texture.load(gl, "toon/toon${(i + 1).toString().padLeft(2, '0')}.bmp");
       return texture;
     });
 
-    //this._loadPMD();
-    this._loadPMX();
-    this._loadVMD();
+    String model_file = "model/夕立改二（B式）1.01.pmx";
+    //String model_file = "model/miku.pmd";
+    String motion_file = "motion/kishimen.vmd";
+    
+    this._loadMesh(model_file);
+    this._loadVMD(motion_file);
   }
 
-  MMD_Renderer(int width, int height)
-  {
+  MMD_Renderer(int width, int height) {
     this.initContext(width, height);
     this.initTrackball();
 
     this._initialize();
   }
 
-  MMD_Renderer.from(WebGLRenderer src)
-  {
+  MMD_Renderer.from(WebGLRenderer src) {
     this.gl = gl;
     this.dom = src.dom;
 
     this._initialize();
   }
+  
+  Future<MMD_Mesh> _loadMesh(String filename) {
+    RegExp re_pmd = new RegExp(r"\.pmd$", caseSensitive: false);
+    if(re_pmd.hasMatch(filename)) {
+      return this._loadPMD(filename).then((PMD_Model pmd) {
+        return new Future.value(this.mesh);
+      });
+    }
+    
+    RegExp re_pmx = new RegExp(r"\.pmx$", caseSensitive: false);
+    if(re_pmx.hasMatch(filename)) {
+      return this._loadPMX(filename).then((PMX_Model pmx) {
+        return new Future.value(this.mesh);
+      });
+    }
+    
+    return new Future.error(new Exception("Unknown file type: $filename"));
+  }
 
-  void _loadVMD() {
-    (new VMD_Animation())
-    .load("motion/kishimen.vmd")
-    .then((VMD_Animation vmd) {
+  Future<VMD_Animation> _loadVMD(String filename) {
+    return (new VMD_Animation()).load(filename).then((VMD_Animation vmd) {
       this.vmd = vmd;
+      
+      return new Future.value(vmd);
     });
   }
 
-  void _loadPMD() {
-    (new PMD_Model())
-    .load("model/miku.pmd")
-    .then((PMD_Model pmd){
+  Future<PMD_Model> _loadPMD(String filename) {
+    return (new PMD_Model()).load(filename).then((PMD_Model pmd) {
       var position_list = pmd.createPositionList();
       var normal_list = pmd.createNormalList();
       var coord_list = pmd.createCoordList();
       var bone_buffer = pmd.createBoneList();
       var edge_buffer = pmd.createEdgeList();
-      
+
       MMD_Mesh mesh = new MMD_Mesh();
 
       mesh.position_buffer = new WebGLArrayBuffer32(gl, position_list);
@@ -294,7 +325,7 @@ class MMD_Renderer extends WebGLRenderer {
       mesh.bone_buffer = new WebGLArrayBuffer32(gl, bone_buffer);
 
       mesh.textures = new Map<String, WebGLCanvasTexture>();
-      mesh.materials = new List<MaterialNode>.generate(pmd.materials.length, (int i){
+      mesh.materials = new List<MaterialNode>.generate(pmd.materials.length, (int i) {
         PMD_Material pmd_material = pmd.materials[i];
         MaterialNode material = new MaterialNode();
 
@@ -307,7 +338,9 @@ class MMD_Renderer extends WebGLRenderer {
         material.specular = new Vector3.copy(pmd_material.specular);
         material.texture_file_name = pmd_material.texture_file_name;
 
-        if(material.texture_file_name != null && material.texture_file_name.isNotEmpty && !mesh.textures.containsKey(material.texture_file_name)) {
+        if (material.texture_file_name != null &&
+            material.texture_file_name.isNotEmpty &&
+            !mesh.textures.containsKey(material.texture_file_name)) {
           var texture = new WebGLCanvasTexture(gl);
           texture.load(gl, "model/${material.texture_file_name}");
           mesh.textures[material.texture_file_name] = texture;
@@ -316,27 +349,26 @@ class MMD_Renderer extends WebGLRenderer {
         return material;
       });
 
-      mesh.index_buffer_list = new List<WebGLElementArrayBuffer16>.generate(mesh.materials.length,
-        (int i) => new WebGLElementArrayBuffer16(gl, pmd.createTriangleList(i))
-      );
+      mesh.index_buffer_list = new List<WebGLElementArrayBuffer16>.generate(
+          mesh.materials.length,
+          (int i) => new WebGLElementArrayBuffer16(gl, pmd.createTriangleList(i)));
 
       Float32List bone_data = new Float32List(8 * 512 * 4);
       mesh.bones = this._createBoneNodesFromPMD(pmd.bones);
-      mesh.bone_texture = new WebGLTypedDataTexture(gl, bone_data, width : 8, height : 512, type : GL.FLOAT);
-      
+      mesh.bone_texture = new WebGLTypedDataTexture(gl, bone_data, width: 8, height: 512, type: GL.FLOAT);
+
       mesh.toon_textures = this.toon_textures;
       mesh.diffuse_texture = this.diffuse_texture;
       mesh.white_texture = this.white_texture;
-      
+
       this.mesh = mesh;
       this.pmd = pmd;
+      return new Future.value(this.pmd);
     });
   }
 
-  void _loadPMX() {
-    (new PMX_Model())
-    .load("model/夕立改二（B式）1.01.pmx")
-    .then((PMX_Model pmx){
+  Future<PMX_Model> _loadPMX(String filename) {
+    return (new PMX_Model()).load(filename).then((PMX_Model pmx) {
       var position_list = pmx.createPositionList();
       var normal_list = pmx.createNormalList();
       var coord_list = pmx.createCoordList();
@@ -352,13 +384,13 @@ class MMD_Renderer extends WebGLRenderer {
 
       mesh.textures = new Map<String, WebGLCanvasTexture>();
 
-      pmx.textures.forEach((String file_name){
-        var texture = new WebGLCanvasTexture(gl, color : new Vector4(1.0, 1.0, 1.0, 1.0));
+      pmx.textures.forEach((String file_name) {
+        var texture = new WebGLCanvasTexture(gl, color: new Vector4(1.0, 1.0, 1.0, 1.0));
         texture.load(gl, "model/$file_name");
         mesh.textures[file_name] = texture;
       });
 
-      mesh.materials = new List<MaterialNode>.generate(pmx.materials.length, (int i){
+      mesh.materials = new List<MaterialNode>.generate(pmx.materials.length, (int i) {
         PMX_Material pmx_material = pmx.materials[i];
         MaterialNode material = new MaterialNode();
         material.face_vert_count = pmx_material.face_vert_count;
@@ -367,8 +399,8 @@ class MMD_Renderer extends WebGLRenderer {
         material.specular = new Vector3.copy(pmx_material.specular);
         material.shiness = pmx_material.shiness;
 
-        if(pmx_material.toon_index != null && pmx_material.toon_index >= 0) {
-          switch(pmx_material.toon_mode) {
+        if (pmx_material.toon_index != null && pmx_material.toon_index >= 0) {
+          switch (pmx_material.toon_mode) {
             case 0:
               material.toon_texture_file_name = pmx.textures[pmx_material.toon_index];
               break;
@@ -378,7 +410,7 @@ class MMD_Renderer extends WebGLRenderer {
           }
         }
 
-        if(pmx_material.texture_index != null && pmx_material.texture_index >= 0) {
+        if (pmx_material.texture_index != null && pmx_material.texture_index >= 0) {
           material.texture_file_name = pmx.textures[pmx_material.texture_index];
         }
 
@@ -387,35 +419,37 @@ class MMD_Renderer extends WebGLRenderer {
         return material;
       });
 
-      if(pmx.vertex_index_size == 1) {
-        mesh.index_buffer_list = new List<WebGLElementArrayBuffer8>.generate(mesh.materials.length,
-          (int i) => new WebGLElementArrayBuffer8(gl, pmx.createTriangleList(i))
-        );
-      } else if(pmx.vertex_index_size == 2) {
-        mesh.index_buffer_list = new List<WebGLElementArrayBuffer16>.generate(mesh.materials.length,
-          (int i) => new WebGLElementArrayBuffer16(gl, pmx.createTriangleList(i))
-        );
-      } else if(pmx.vertex_index_size == 4) {
-        mesh.index_buffer_list = new List<WebGLElementArrayBuffer32>.generate(mesh.materials.length,
-          (int i) => new WebGLElementArrayBuffer32(gl, pmx.createTriangleList(i))
-        );
+      if (pmx.vertex_index_size == 1) {
+        mesh.index_buffer_list = new List<WebGLElementArrayBuffer8>.generate(
+            mesh.materials.length,
+            (int i) => new WebGLElementArrayBuffer8(gl, pmx.createTriangleList(i)));
+      } else if (pmx.vertex_index_size == 2) {
+        mesh.index_buffer_list = new List<WebGLElementArrayBuffer16>.generate(
+            mesh.materials.length,
+            (int i) => new WebGLElementArrayBuffer16(gl, pmx.createTriangleList(i)));
+      } else if (pmx.vertex_index_size == 4) {
+        mesh.index_buffer_list = new List<WebGLElementArrayBuffer32>.generate(
+            mesh.materials.length,
+            (int i) => new WebGLElementArrayBuffer32(gl, pmx.createTriangleList(i)));
       }
 
       Float32List bone_data = new Float32List(8 * 512 * 4);
       mesh.bones = this._createBoneNodesFromPMX(pmx.bones);
-      mesh.bone_texture = new WebGLTypedDataTexture(gl, bone_data, width : 8, height : 512, type : GL.FLOAT);
+      mesh.bone_texture = new WebGLTypedDataTexture(gl, bone_data, width: 8, height: 512, type: GL.FLOAT);
 
       mesh.toon_textures = this.toon_textures;
       mesh.diffuse_texture = this.diffuse_texture;
       mesh.white_texture = this.white_texture;
-      
+
       this.mesh = mesh;
       this.pmx = pmx;
+      
+      return new Future.value(this.pmx);
     });
   }
 
   List<BoneNode> _createBoneNodesFromPMX(List<PMX_Bone> pmx_bones) {
-    List<BoneNode> bone_nodes = new List<BoneNode>.generate(pmx_bones.length, (int i){
+    List<BoneNode> bone_nodes = new List<BoneNode>.generate(pmx_bones.length, (int i) {
       BoneNode bone = new BoneNode();
       PMX_Bone pmx_bone = pmx_bones[i];
 
@@ -423,7 +457,7 @@ class MMD_Renderer extends WebGLRenderer {
       bone.original_bone_position = new Vector3.copy(pmx_bone.bone_head_pos);
       bone.ik_iterations = pmx_bone.iterations;
       bone.max_angle = pmx_bone.max_angle;
-      if(pmx_bone.parent_bone_index >= 0) {
+      if (pmx_bone.parent_bone_index >= 0) {
         PMX_Bone parent_pmd_bone = pmx_bones[pmx_bone.parent_bone_index];
         bone.relative_bone_position = pmx_bone.bone_head_pos - parent_pmd_bone.bone_head_pos;
       } else {
@@ -432,39 +466,45 @@ class MMD_Renderer extends WebGLRenderer {
       return bone;
     });
 
-    for(int i = 0; i < pmx_bones.length; i++) {
+    for (int i = 0; i < pmx_bones.length; i++) {
       PMX_Bone pmx_bone = pmx_bones[i];
       BoneNode bone = bone_nodes[i];
 
-      if(pmx_bone.iks != null && pmx_bone.iks.isNotEmpty) {
-        bone.iks = pmx_bone.iks.map((PMX_IK pmx_ik){
+      if (pmx_bone.iks != null && pmx_bone.iks.isNotEmpty) {
+        bone.iks = pmx_bone.iks.map((PMX_IK pmx_ik) {
           IKNode ik = new IKNode();
           ik.bone = bone_nodes[pmx_ik.bone_index];
-          if(pmx_ik.max != null) {
+          if (pmx_ik.max != null) {
             ik.max = pmx_ik.max.clone();
           }
-          if(pmx_ik.min != null) {
+          if (pmx_ik.min != null) {
             ik.min = pmx_ik.min.clone();
           }
           return ik;
         }).toList();
       }
 
-      if(pmx_bone.ik_target_bone_index != null && 0 <= pmx_bone.ik_target_bone_index  && pmx_bone.ik_target_bone_index < pmx_bones.length) {
+      if (pmx_bone.ik_target_bone_index != null &&
+          0 <= pmx_bone.ik_target_bone_index &&
+          pmx_bone.ik_target_bone_index < pmx_bones.length) {
         bone.ik_target_bone = bone_nodes[pmx_bone.ik_target_bone_index];
       }
 
-      if(pmx_bone.parent_bone_index != null && 0 <= pmx_bone.parent_bone_index  && pmx_bone.parent_bone_index < pmx_bones.length) {
+      if (pmx_bone.parent_bone_index != null &&
+          0 <= pmx_bone.parent_bone_index &&
+          pmx_bone.parent_bone_index < pmx_bones.length) {
         bone.parent = bone_nodes[pmx_bone.parent_bone_index];
       }
 
-      if(pmx_bone.ik_parent_transform_bone_index != null && 0 <= pmx_bone.ik_parent_transform_bone_index  && pmx_bone.ik_parent_transform_bone_index < pmx_bones.length) {
+      if (pmx_bone.ik_parent_transform_bone_index != null &&
+          0 <= pmx_bone.ik_parent_transform_bone_index &&
+          pmx_bone.ik_parent_transform_bone_index < pmx_bones.length) {
         bone.ik_parent_transform = bone_nodes[pmx_bone.ik_parent_transform_bone_index];
         bone.ik_parent_transform_weight = pmx_bone.ik_parent_transform_bone_weight;
       }
 
-      for(int j = 0; j < pmx_bones.length; j++) {
-        if(pmx_bones[j].parent_bone_index == i) {
+      for (int j = 0; j < pmx_bones.length; j++) {
+        if (pmx_bones[j].parent_bone_index == i) {
           bone.children.add(bone_nodes[j]);
         }
       }
@@ -474,7 +514,7 @@ class MMD_Renderer extends WebGLRenderer {
   }
 
   List<BoneNode> _createBoneNodesFromPMD(List<PMD_Bone> pmd_bones) {
-    List<BoneNode> bone_nodes = new List<BoneNode>.generate(pmd_bones.length, (int i){
+    List<BoneNode> bone_nodes = new List<BoneNode>.generate(pmd_bones.length, (int i) {
       BoneNode bone = new BoneNode();
       PMD_Bone pmd_bone = pmd_bones[i];
 
@@ -482,7 +522,7 @@ class MMD_Renderer extends WebGLRenderer {
       bone.bone_type = pmd_bone.bone_type;
       bone.original_bone_position = new Vector3.copy(pmd_bone.bone_head_pos);
 
-      if(pmd_bone.parent_bone_index >= 0) {
+      if (pmd_bone.parent_bone_index >= 0) {
         PMD_Bone parent_pmd_bone = pmd_bones[pmd_bone.parent_bone_index];
         bone.relative_bone_position = pmd_bone.bone_head_pos - parent_pmd_bone.bone_head_pos;
       } else {
@@ -491,16 +531,16 @@ class MMD_Renderer extends WebGLRenderer {
       return bone;
     });
 
-    for(int i = 0; i < pmd_bones.length; i++) {
+    for (int i = 0; i < pmd_bones.length; i++) {
       PMD_Bone pmd_bone = pmd_bones[i];
       BoneNode bone = bone_nodes[i];
 
-      if(0 <= pmd_bone.parent_bone_index  && pmd_bone.parent_bone_index < pmd_bones.length) {
+      if (0 <= pmd_bone.parent_bone_index && pmd_bone.parent_bone_index < pmd_bones.length) {
         bone.parent = bone_nodes[pmd_bone.parent_bone_index];
       }
 
-      for(int j = 0; j < pmd_bones.length; j++) {
-        if(pmd_bones[j].parent_bone_index == i) {
+      for (int j = 0; j < pmd_bones.length; j++) {
+        if (pmd_bones[j].parent_bone_index == i) {
           bone.children.add(bone_nodes[j]);
         }
       }
@@ -510,17 +550,22 @@ class MMD_Renderer extends WebGLRenderer {
   }
 
   void _writeBoneTexture(List<BoneNode> bones, Float32List bone_data) {
-    for(int i = 0; i < bones.length; i++) {
+    for (int i = 0; i < bones.length; i++) {
       BoneNode bone = bones[i];
       int offset = i * 32;
 
-      bone_data.setRange(offset, offset + 16, bone.relative_transform.storage); offset += 16;
+      bone_data.setRange(offset, offset + 16, bone.relative_transform.storage);
+      offset += 16;
 
-      bone_data.setRange(offset, offset + 3, bone.original_bone_position.storage); offset += 3;
-      bone_data[offset] = 1.0; offset += 1;
+      bone_data.setRange(offset, offset + 3, bone.original_bone_position.storage);
+      offset += 3;
+      bone_data[offset] = 1.0;
+      offset += 1;
 
-      bone_data.setRange(offset, offset + 3, bone.absolute_bone_position.storage); offset += 3;
-      bone_data[offset] = 1.0; offset += 1;
+      bone_data.setRange(offset, offset + 3, bone.absolute_bone_position.storage);
+      offset += 3;
+      bone_data[offset] = 1.0;
+      offset += 1;
     }
   }
 
@@ -530,7 +575,7 @@ class MMD_Renderer extends WebGLRenderer {
 
     Vector3 target_position = target_bone_node.absolute_bone_position;
     Vector3 ik_position = ik_bone_node.absolute_bone_position;
-    if(target_position.distanceToSquared(ik_position) < 0.01) {
+    if (target_position.distanceToSquared(ik_position) < 0.01) {
       return;
     }
 
@@ -541,7 +586,7 @@ class MMD_Renderer extends WebGLRenderer {
 
     Vector3 axis = v1.cross(v2).normalize();
 
-    if(child_bone.name == "左ひざ" || child_bone.name == "右ひざ") {
+    if (child_bone.name == "左ひざ" || child_bone.name == "右ひざ") {
       Quaternion q = new Quaternion.identity();
       q.setAxisAngle(axis, Math.min(theta, ik.max_angle * 4.0));
 
@@ -565,15 +610,15 @@ class MMD_Renderer extends WebGLRenderer {
 
     BoneNode ik_bone_node = bones[ik.bone_index];
     BoneNode target_bone_node = bones[ik.target_bone_index];
-    for(int i = 0; i < ik.iterations; i++) {
-      child_bones.forEach((BoneNode child_bone) => this._updateChildPMDIK(child_bone, bones, ik) );
+    for (int i = 0; i < ik.iterations; i++) {
+      child_bones.forEach((BoneNode child_bone) => this._updateChildPMDIK(child_bone, bones, ik));
     }
   }
 
   void _updateChildPMXIK(IKNode ik, BoneNode ik_bone_node, BoneNode target_bone_node) {
     Vector3 target_position = target_bone_node.absolute_bone_position;
     Vector3 ik_position = ik_bone_node.absolute_bone_position;
-    if(target_position.distanceToSquared(ik_position) < 0.01) {
+    if (target_position.distanceToSquared(ik_position) < 0.01) {
       return;
     }
 
@@ -583,7 +628,7 @@ class MMD_Renderer extends WebGLRenderer {
 
     Vector3 axis = v1.cross(v2).normalize();
 
-    if(ik.max != null || ik.min != null) {
+    if (ik.max != null || ik.min != null) {
       Quaternion q1 = new Quaternion.identity();
       q1.setAxisAngle(axis, Math.min(theta, ik_bone_node.max_angle));
 
@@ -610,11 +655,11 @@ class MMD_Renderer extends WebGLRenderer {
   }
 
   void _updatePMXIK(List<BoneNode> bones) {
-    bones.where((BoneNode bone) => (bone.iks != null) && bone.iks.isNotEmpty).forEach((BoneNode ik_bone_node){
+    bones.where((BoneNode bone) => (bone.iks != null) && bone.iks.isNotEmpty).forEach((BoneNode ik_bone_node) {
       BoneNode target_bone_node = ik_bone_node.ik_target_bone;
 
-      for(int i = 0; i < ik_bone_node.ik_iterations; i++) {
-        ik_bone_node.iks.forEach((IKNode ik){
+      for (int i = 0; i < ik_bone_node.ik_iterations; i++) {
+        ik_bone_node.iks.forEach((IKNode ik) {
           this._updateChildPMXIK(ik, ik_bone_node, target_bone_node);
         });
       }
@@ -626,15 +671,20 @@ class MMD_Renderer extends WebGLRenderer {
 
     bones.where((BoneNode bone) => bone.parent == null).forEach((BoneNode bone) => bone.update());
 
-    if(iks != null) {
+    if (iks != null) {
       iks.forEach((ik) => this._updatePMDIK(bones, ik));
     } else {
       this._updatePMXIK(bones);
-    };
+    }
 
-    bones.where((BoneNode bone) => bone.ik_parent_transform != null).forEach((BoneNode bone){
-      slerpQuaternion(bone.rotation, bone.ik_parent_transform.rotation, bone.ik_parent_transform_weight).copyTo(bone.rotation);
-      (bone.ik_parent_transform.position * bone.ik_parent_transform_weight + bone.position * (1.0 - bone.ik_parent_transform_weight)).copyInto(bone.position);
+
+    bones.where((BoneNode bone) => bone.ik_parent_transform != null).forEach((BoneNode bone) {
+      slerpQuaternion(
+          bone.rotation,
+          bone.ik_parent_transform.rotation,
+          bone.ik_parent_transform_weight).copyTo(bone.rotation);
+      (bone.ik_parent_transform.position * bone.ik_parent_transform_weight +
+          bone.position * (1.0 - bone.ik_parent_transform_weight)).copyInto(bone.position);
       bone.update();
     });
   }
@@ -643,16 +693,16 @@ class MMD_Renderer extends WebGLRenderer {
     this.debug_particle_shader.vertices = new List<DebugVertex>();
     this.debug_axis_shader.axises = new List<DebugAxis>();
 
-    if ((this.pmx == null && this.pmd == null) || this.vmd == null) {
+    if (this.mesh == null || this.vmd == null) {
       return;
     }
 
-    if(this.start == null) {
+    if (this.start == null) {
       this.start = elapsed;
       this.frame = 0;
     }
 
-    if(this.play) {
+    if (this.play) {
       this.frame = ((elapsed - start) / 30.0).round() % 750;
     }
 
@@ -669,40 +719,65 @@ class MMD_Renderer extends WebGLRenderer {
     Matrix4 model = rot;
     Matrix4 mvp = projection * view * model;
 
-    if(this.pmd != null) {
+    if (this.pmd != null) {
       this._updateBoneAnimation(this.mesh.bones, this.pmd.iks, this.vmd, this.frame);
-    } else if(this.pmx != null) {
+    } else if (this.pmx != null) {
       this._updateBoneAnimation(this.mesh.bones, null, this.vmd, this.frame);
     }
     //this.bones.where((BoneNode bone) => bone.parent == null).forEach((BoneNode bone) => bone.update());
     this._writeBoneTexture(this.mesh.bones, this.mesh.bone_texture.data);
     this.mesh.bone_texture.refresh(gl);
-    
+
     Map<String, double> morph_weights = this.vmd.getMorphFrame(frame);
-    if(this.pmx != null) {
-      this.pmx.createSubPositionList(morph_weights).forEach((SubArrayData sub_data){
+    if (this.pmx != null) {
+      this.pmx.createSubPositionList(morph_weights).forEach((SubArrayData sub_data) {
         this.mesh.position_buffer.setSubData(gl, sub_data);
       });
     }
 
-    //setup shader
-    gl.clearColor(0.5, 0.5, 0.5, 1.0);
-    gl.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
+    if (this.enable_deferred_shader) {
+      //setup shader
+      gl.bindFramebuffer(GL.FRAMEBUFFER, this.deferred_shader.fbo);
+      gl.clearColor(0.5, 0.5, 0.5, 1.0);
+      gl.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
 
-    this.edge_shader.mesh = this.mesh;
+      this.deferred_shader.mesh = this.mesh;
+      this.deferred_shader.model = model;
+      this.deferred_shader.view = view;
+      this.deferred_shader.projection = projection;
+      this.deferred_shader.mvp = mvp;
+      this.deferred_shader.render(elapsed);
 
-    this.edge_shader.model = model;
-    this.edge_shader.view = view;
-    this.edge_shader.projection = projection;
-    this.edge_shader.mvp = mvp;
-    this.edge_shader.render(elapsed);
+      gl.bindFramebuffer(GL.FRAMEBUFFER, null);
+      this.copy_renderer.texture_buffer = this.deferred_shader.color_texture;
+      this.copy_renderer.render(elapsed);
+    } else {
+      //setup shader
+      gl.bindFramebuffer(GL.FRAMEBUFFER, this.fbo.buffer);
+      gl.clearColor(0.5, 0.5, 0.5, 1.0);
+      gl.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
 
-    this.main_shader.mesh = this.mesh;
-    this.main_shader.model = model;
-    this.main_shader.view = view;
-    this.main_shader.projection = projection;
-    this.main_shader.mvp = mvp;
-    this.main_shader.render(elapsed);
+      if (this.enable_edge_shader) {
+        this.edge_shader.mesh = this.mesh;
+
+        this.edge_shader.model = model;
+        this.edge_shader.view = view;
+        this.edge_shader.projection = projection;
+        this.edge_shader.mvp = mvp;
+        this.edge_shader.render(elapsed);
+      }
+
+      this.main_shader.mesh = this.mesh;
+      this.main_shader.model = model;
+      this.main_shader.view = view;
+      this.main_shader.projection = projection;
+      this.main_shader.mvp = mvp;
+      this.main_shader.render(elapsed);
+
+      gl.bindFramebuffer(GL.FRAMEBUFFER, null);
+      this.copy_renderer.texture_buffer = this.fbo.texture;
+      this.copy_renderer.render(elapsed);
+    }
 
     //mvp.copyInto(this.debug_axis_shader.mvp);
     //this.debug_axis_shader.render(elapsed);
