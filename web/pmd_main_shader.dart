@@ -100,19 +100,8 @@ class PMD_MainShader extends WebGLRenderer {
     gl_FragColor = vec4(color, diffuse.a * tex_color.a);
   }
   """;
-
-  List<MaterialNode> materials;
-  WebGLArrayBuffer32 position_buffer;
-  WebGLArrayBuffer32 normal_buffer;
-  WebGLArrayBuffer32 coord_buffer;
-  WebGLArrayBuffer32 bone_buffer;
-
-  List<WebGLBuffer> index_buffer_list;
-  Map<String, WebGLCanvasTexture> textures;
-  List<WebGLCanvasTexture> toon_textures;
-  WebGLCanvasTexture white_texture;
-  WebGLCanvasTexture diffuse_texture;
-  WebGLTypedDataTexture bone_texture;
+  
+  MMD_Mesh mesh;
 
   GL.Program program;
   Map<String, int> attributes;
@@ -166,7 +155,7 @@ class PMD_MainShader extends WebGLRenderer {
   {
     gl.enable(GL.DEPTH_TEST);
     gl.depthFunc(GL.LEQUAL);
-    //gl.depthMask(true);
+    gl.blendFunc(GL.SRC_ALPHA, GL.ONE_MINUS_SRC_ALPHA);
 
     gl.disable(GL.CULL_FACE);
 
@@ -190,32 +179,32 @@ class PMD_MainShader extends WebGLRenderer {
 
     if (this.attributes.containsKey("normal")) {
       gl.enableVertexAttribArray(this.attributes["normal"]);
-      gl.bindBuffer(GL.ARRAY_BUFFER, this.normal_buffer.buffer);
+      gl.bindBuffer(GL.ARRAY_BUFFER, this.mesh.normal_buffer.buffer);
       gl.vertexAttribPointer(this.attributes["normal"], 3, GL.FLOAT, false, 0, 0);
     }
 
     if (this.attributes.containsKey("position")) {
       gl.enableVertexAttribArray(this.attributes["position"]);
-      gl.bindBuffer(GL.ARRAY_BUFFER, this.position_buffer.buffer);
+      gl.bindBuffer(GL.ARRAY_BUFFER, this.mesh.position_buffer.buffer);
       gl.vertexAttribPointer(this.attributes["position"], 3, GL.FLOAT, false, 0, 0);
     }
 
     if (this.attributes.containsKey("coord")) {
       gl.enableVertexAttribArray(this.attributes["coord"]);
-      gl.bindBuffer(GL.ARRAY_BUFFER, this.coord_buffer.buffer);
+      gl.bindBuffer(GL.ARRAY_BUFFER, this.mesh.coord_buffer.buffer);
       gl.vertexAttribPointer(this.attributes["coord"], 2, GL.FLOAT, false, 0, 0);
     }
 
     if (this.attributes.containsKey("bone")) {
       gl.enableVertexAttribArray(this.attributes["bone"]);
-      gl.bindBuffer(GL.ARRAY_BUFFER, this.bone_buffer.buffer);
+      gl.bindBuffer(GL.ARRAY_BUFFER, this.mesh.bone_buffer.buffer);
       gl.vertexAttribPointer(this.attributes["bone"], 3, GL.FLOAT, false, 0, 0);
     }
 
-    for (int i = 0; i < this.materials.length; i++) {
-      var index_buffer = this.index_buffer_list[i];
+    for (int i = 0; i < this.mesh.materials.length; i++) {
+      var index_buffer = this.mesh.index_buffer_list[i];
 
-      var material = this.materials[i];
+      var material = this.mesh.materials[i];
 
       if (this.uniforms.containsKey("diffuse")) {
         var color = new Vector4.copy(material.diffuse);
@@ -230,10 +219,10 @@ class PMD_MainShader extends WebGLRenderer {
       if (this.uniforms.containsKey("texture")) {
         gl.activeTexture(GL.TEXTURE0);
         GL.Texture texture;
-        if(this.textures.containsKey(material.texture_file_name)) {
-          texture = this.textures[material.texture_file_name].texture;
+        if(this.mesh.textures.containsKey(material.texture_file_name)) {
+          texture = this.mesh.textures[material.texture_file_name].texture;
         } else {
-          texture = this.white_texture.texture;
+          texture = this.mesh.white_texture.texture;
         }
         gl.bindTexture(GL.TEXTURE_2D, texture);
         gl.uniform1i(this.uniforms["texture"], 0);
@@ -241,17 +230,17 @@ class PMD_MainShader extends WebGLRenderer {
 
       if (this.uniforms.containsKey("bone_texture")) {
         gl.activeTexture(GL.TEXTURE1);
-        gl.bindTexture(GL.TEXTURE_2D, this.bone_texture.texture);
+        gl.bindTexture(GL.TEXTURE_2D, this.mesh.bone_texture.texture);
         gl.uniform1i(this.uniforms["bone_texture"], 1);
       }
 
       if (this.uniforms.containsKey("toon_texture")) {
         gl.activeTexture(GL.TEXTURE2);
         GL.Texture texture;
-        if(this.toon_textures[material.toon_index] != null) {
-          texture = this.toon_textures[material.toon_index].texture;
+        if(this.mesh.toon_textures[material.toon_index] != null) {
+          texture = this.mesh.toon_textures[material.toon_index].texture;
         } else {
-          texture = this.diffuse_texture.texture;
+          texture = this.mesh.diffuse_texture.texture;
         }
         gl.bindTexture(GL.TEXTURE_2D, texture);
         gl.uniform1i(this.uniforms["toon_texture"], 2);

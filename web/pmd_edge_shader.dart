@@ -87,14 +87,8 @@ class PMD_EdgeShader extends WebGLRenderer {
     gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
   }
   """;
-
-  WebGLArrayBuffer32 position_buffer;
-  WebGLArrayBuffer32 edge_buffer;
-  WebGLArrayBuffer32 normal_buffer;
-  WebGLArrayBuffer32 bone_buffer;
-
-  List<WebGLBuffer> index_buffer_list;
-  WebGLTypedDataTexture bone_texture;
+  
+  MMD_Mesh mesh;
 
   GL.Program program;
   Map<String, int> attributes;
@@ -168,34 +162,34 @@ class PMD_EdgeShader extends WebGLRenderer {
 
     if (this.attributes.containsKey("normal")) {
       gl.enableVertexAttribArray(this.attributes["normal"]);
-      gl.bindBuffer(GL.ARRAY_BUFFER, this.normal_buffer.buffer);
+      gl.bindBuffer(GL.ARRAY_BUFFER, this.mesh.normal_buffer.buffer);
       gl.vertexAttribPointer(this.attributes["normal"], 3, GL.FLOAT, false, 0, 0);
     }
 
     if (this.attributes.containsKey("edge")) {
       gl.enableVertexAttribArray(this.attributes["edge"]);
-      gl.bindBuffer(GL.ARRAY_BUFFER, this.edge_buffer.buffer);
+      gl.bindBuffer(GL.ARRAY_BUFFER, this.mesh.edge_buffer.buffer);
       gl.vertexAttribPointer(this.attributes["edge"], 1, GL.FLOAT, false, 0, 0);
     }
 
     if (this.attributes.containsKey("position")) {
       gl.enableVertexAttribArray(this.attributes["position"]);
-      gl.bindBuffer(GL.ARRAY_BUFFER, this.position_buffer.buffer);
+      gl.bindBuffer(GL.ARRAY_BUFFER, this.mesh.position_buffer.buffer);
       gl.vertexAttribPointer(this.attributes["position"], 3, GL.FLOAT, false, 0, 0);
     }
 
     if (this.attributes.containsKey("bone")) {
       gl.enableVertexAttribArray(this.attributes["bone"]);
-      gl.bindBuffer(GL.ARRAY_BUFFER, this.bone_buffer.buffer);
+      gl.bindBuffer(GL.ARRAY_BUFFER, this.mesh.bone_buffer.buffer);
       gl.vertexAttribPointer(this.attributes["bone"], 3, GL.FLOAT, false, 0, 0);
     }
 
-    for (int i = 0; i < this.index_buffer_list.length; i++) {
-      var index_buffer = this.index_buffer_list[i];
+    for (int i = 0; i < this.mesh.index_buffer_list.length; i++) {
+      var index_buffer = this.mesh.index_buffer_list[i];
 
       if (this.uniforms.containsKey("bone_texture")) {
         gl.activeTexture(GL.TEXTURE1);
-        gl.bindTexture(GL.TEXTURE_2D, this.bone_texture.texture);
+        gl.bindTexture(GL.TEXTURE_2D, this.mesh.bone_texture.texture);
         gl.uniform1i(this.uniforms["bone_texture"], 1);
       }
 
