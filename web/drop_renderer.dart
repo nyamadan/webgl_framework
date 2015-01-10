@@ -1,18 +1,13 @@
-library copy_renderer;
+part of ripple_renderer;
 
-import "dart:typed_data";
-import "dart:web_gl" as GL;
-import "package:vector_math/vector_math.dart";
-import "package:webgl_framework/webgl_framework.dart";
-
-class CopyRenderer extends WebGLRenderer {
+class DropRenderer extends WebGLRenderer {
   static const String VS =
   """
   attribute vec3 position;
-  varying vec2 v_coord;
+  varying vec2 coord;
 
   void main(void){
-    v_coord = position.xy * 0.5 + 0.5;
+    coord = position.xy * 0.5 + 0.5;
     gl_Position = vec4(position, 1.0);
   }
   """;
@@ -21,23 +16,29 @@ class CopyRenderer extends WebGLRenderer {
   """
   precision mediump float;
 
-  uniform vec2 half_pixel;
+  const float PI = 3.141592653589793;
   uniform sampler2D texture;
-
-  varying vec2 v_coord;
+  uniform vec2 center;
+  uniform float radius;
+  uniform float strength;
+  varying vec2 coord;
 
   void main(void){
-    vec4 color = texture2D(texture, v_coord);
-    gl_FragColor = vec4(color.rgb, 1.0);
+    vec4 info = texture2D(texture, coord);
+    float drop = max(0.0, 1.0 - length(center * 0.5 + 0.5 - coord) / radius);
+    drop = 0.5 - cos(drop * PI) * 0.5;
+    info.r += drop * strength;
+    gl_FragColor = info;
   }
   """;
 
   GL.Program program;
   
-  GL.Texture texture_buffer;
-
-  Map<String, int> attributes;
-  Map<String, GL.UniformLocation> uniforms;
+  GL.Texture ripple_texture;
+  
+  Vector2 center;
+  double radius;
+  double strength;
 
   WebGLArrayBuffer32 position_buffer;
   WebGLElementArrayBuffer16 index_buffer;
@@ -54,7 +55,9 @@ class CopyRenderer extends WebGLRenderer {
     ]);
     this.uniforms = this.getUniformLocations(this.program, [
       "texture",
-      "half_pixel",
+      "center",
+      "strength",
+      "radius",
     ]);
 
     this.position_buffer = new WebGLArrayBuffer32(gl, new Float32List.fromList([
@@ -70,7 +73,7 @@ class CopyRenderer extends WebGLRenderer {
     ]));
   }
 
-  CopyRenderer(int width, int height)
+  DropRenderer(int width, int height)
   {
     this.initContext(width, height);
     this.initTrackball();
@@ -78,13 +81,13 @@ class CopyRenderer extends WebGLRenderer {
     this._initialize();
   }
 
-  CopyRenderer.copy(WebGLRenderer src) {
+  DropRenderer.copy(WebGLRenderer src) {
     this.gl = src.gl;
     this.dom = src.dom;
 
     this._initialize();
   }
-
+  
   void render(double ms) {
     gl.viewport(0, 0, this.dom.width, this.dom.height);
     gl.useProgram(this.program);
@@ -92,8 +95,10 @@ class CopyRenderer extends WebGLRenderer {
     gl.enable(GL.DEPTH_TEST);
     gl.clearColor(0.5, 0.5, 0.5, 1.0);
 
-    this.setUniformTexture0("texture", this.texture_buffer);
-    this.setUniformVector2("half_pixel", new Vector2(0.5 / this.dom.width, 0.5 / this.dom.height));
+    this.setUniformTexture0("texture", this.ripple_texture);
+    this.setUniformVector2("center", this.center != null ? this.center : new Vector2.zero());
+    this.setUniformFloat("radius", this.radius != null ? this.radius : 0.125);
+    this.setUniformFloat("strength", this.strength != null ? this.strength : 0.05);
     this.setAttributeFloat3("position", this.position_buffer.buffer);
 
     gl.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
