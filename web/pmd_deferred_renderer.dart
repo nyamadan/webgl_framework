@@ -38,14 +38,14 @@ class PMD_DeferredRenderer extends WebGLRenderer {
       for(int j1 = 0; j1 < 2; j1++) {
         vec2 offset1 = vec2(delta.x * float(i1), delta.y * float(j1));
         mat3 tmp_weights = mat3(0.0);
-        vec3 cn = texture2D(normal_texture, v_coord + offset1).rgb * 2.0 - vec3(1.0);;
+        vec3 cn = texture2D(normal_texture, v_coord + offset1).rgb;
         float cz = texture2D(depth_texture, v_coord + offset1).r;
         float sum = 0.0;
         for(int i2 = -1; i2 <= 1; i2++) {
           for(int j2 = -1; j2 <= 1; j2++) {
             if(abs(float(i1 + i2)) <= 1.0 && abs(float(j1 + j2)) <= 1.0) {
               vec2 offset2 = offset1 + vec2(delta.x * float(i2), delta.y * float(j2));
-              vec3 n = texture2D(normal_texture, v_coord + offset2).rgb * 2.0 - vec3(1.0);
+              vec3 n = texture2D(normal_texture, v_coord + offset2).rgb * 2.0;
               float z = texture2D(depth_texture, v_coord + offset2).r;
   
               float w = bilateral(cn, cz, n, z);
