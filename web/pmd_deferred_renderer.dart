@@ -1,10 +1,6 @@
-library copy_renderer;
+part of mmd_renderer;
 
-import "dart:typed_data";
-import "dart:web_gl" as GL;
-import "package:webgl_framework/webgl_framework.dart";
-
-class CopyRenderer extends WebGLRenderer {
+class PMD_DeferredRenderer extends WebGLRenderer {
   static const String VS =
   """
   attribute vec3 position;
@@ -20,19 +16,25 @@ class CopyRenderer extends WebGLRenderer {
   """
   precision mediump float;
 
-  uniform sampler2D texture;
+  uniform sampler2D color_texture;
+  uniform sampler2D normal_texture;
+  uniform sampler2D depth_texture;
 
   varying vec2 v_coord;
 
   void main(void){
-    vec4 color = texture2D(texture, v_coord);
+    vec4 color = texture2D(color_texture, v_coord);
+    vec4 normal = texture2D(normal_texture, v_coord);
+    float depth = texture2D(depth_texture, v_coord).r;
     gl_FragColor = vec4(color.rgb, 1.0);
   }
   """;
 
   GL.Program program;
   
-  GL.Texture texture_buffer;
+  GL.Texture color_texture;
+  GL.Texture normal_texture;
+  GL.Texture depth_texture;
 
   Map<String, int> attributes;
   Map<String, GL.UniformLocation> uniforms;
@@ -50,8 +52,11 @@ class CopyRenderer extends WebGLRenderer {
     this.attributes = this.getAttributes(this.program, [
       "position",
     ]);
+    
     this.uniforms = this.getUniformLocations(this.program, [
-      "texture",
+      "color_texture",
+      "normal_texture",
+      "depth_texture",
     ]);
 
     this.position_buffer = new WebGLArrayBuffer32(gl, new Float32List.fromList([
@@ -67,7 +72,7 @@ class CopyRenderer extends WebGLRenderer {
     ]));
   }
 
-  CopyRenderer(int width, int height)
+  PMD_DeferredRenderer(int width, int height)
   {
     this.initContext(width, height);
     this.initTrackball();
@@ -75,7 +80,7 @@ class CopyRenderer extends WebGLRenderer {
     this._initialize();
   }
 
-  CopyRenderer.copy(WebGLRenderer src) {
+  PMD_DeferredRenderer.copy(WebGLRenderer src) {
     this.gl = src.gl;
     this.dom = src.dom;
 
@@ -87,9 +92,11 @@ class CopyRenderer extends WebGLRenderer {
     gl.useProgram(this.program);
     
     gl.enable(GL.DEPTH_TEST);
-    gl.clearColor(0.5, 0.5, 0.5, 1.0);
 
-    this.setUniformTexture0("texture", this.texture_buffer);
+    this.setUniformTexture0("color_texture", this.color_texture);
+    this.setUniformTexture1("normal_texture", this.normal_texture);
+    this.setUniformTexture2("depth_texture", this.depth_texture);
+    
     this.setAttributeFloat3("position", this.position_buffer.buffer);
 
     gl.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);

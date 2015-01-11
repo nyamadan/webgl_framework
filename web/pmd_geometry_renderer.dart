@@ -1,6 +1,6 @@
 part of mmd_renderer;
 
-class PMD_DeferredShader extends WebGLRenderer {
+class PMD_GeometryRenderer extends WebGLRenderer {
   static const String VS = """
   attribute vec3 position;
   attribute vec3 normal;
@@ -12,6 +12,7 @@ class PMD_DeferredShader extends WebGLRenderer {
 
   uniform sampler2D bone_texture;
 
+  varying vec4 v_position;
   varying vec4 v_normal;
   varying vec2 v_coord;
 
@@ -73,7 +74,8 @@ class PMD_DeferredShader extends WebGLRenderer {
     v_normal = vec4(normalize(mat3(model_matrix * m) * normal), 1.0);
 
     v_coord = coord;
-    gl_Position = projection_matrix * view_matrix * model_matrix * mix(p2, p1, weight);
+    v_position = projection_matrix * view_matrix * model_matrix * mix(p2, p1, weight);
+    gl_Position = v_position;
   }
   """;
 
@@ -86,6 +88,7 @@ class PMD_DeferredShader extends WebGLRenderer {
   uniform sampler2D texture;
   uniform sampler2D toon_texture;
 
+  varying vec4 v_position;
   varying vec4 v_normal;
   varying vec2 v_coord;
 
@@ -94,10 +97,11 @@ class PMD_DeferredShader extends WebGLRenderer {
 
     float n = clamp(dot(v_normal.xyz, vec3(0.0, 0.0, 1.0)), 0.0, 1.0);
     vec3 d = texture2D(toon_texture, vec2(0.5, n)).rgb;
-    vec3 color = diffuse.rgb * tex_color.rgb * clamp(d + ambient, 0.0, 1.0);
+    vec4 color = vec4(diffuse.rgb * tex_color.rgb * clamp(d + ambient, 0.0, 1.0), diffuse.a * tex_color.a);
 
-    gl_FragData[0] = vec4(color, diffuse.a * tex_color.a);
+    gl_FragData[0] = color;
     gl_FragData[1] = v_normal;
+    gl_FragData[2] = vec4(v_position.z / v_position.w);
   }
   """;
 
@@ -119,8 +123,9 @@ class PMD_DeferredShader extends WebGLRenderer {
 
   GL.Texture color_texture;
   GL.Texture normal_texture;
+  GL.Texture depth_texture;
 
-  PMD_DeferredShader.copy(WebGLRenderer src, GL.DrawBuffers glext) {
+  PMD_GeometryRenderer.copy(WebGLRenderer src, GL.DrawBuffers glext) {
     this.gl = src.gl;
     this.glext = glext;
     this.dom = src.dom;
@@ -186,9 +191,21 @@ class PMD_DeferredShader extends WebGLRenderer {
     gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE);
     gl.texImage2DTyped(GL.TEXTURE_2D, 0, GL.RGBA, this.dom.width, this.dom.height, 0, GL.RGBA, GL.FLOAT, null);
 
+    this.depth_texture = gl.createTexture();
+    gl.bindTexture(GL.TEXTURE_2D, this.depth_texture);
+    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.LINEAR);
+    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.LINEAR);
+    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE);
+    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE);
+    gl.texImage2DTyped(GL.TEXTURE_2D, 0, GL.RGBA, this.dom.width, this.dom.height, 0, GL.RGBA, GL.FLOAT, null);
+
     this.fbo = gl.createFramebuffer();
     gl.bindFramebuffer(GL.FRAMEBUFFER, this.fbo);
-    glext.drawBuffersWebgl([GL.DrawBuffers.COLOR_ATTACHMENT0_WEBGL, GL.DrawBuffers.COLOR_ATTACHMENT1_WEBGL,]);
+    glext.drawBuffersWebgl(
+        [
+            GL.DrawBuffers.COLOR_ATTACHMENT0_WEBGL,
+            GL.DrawBuffers.COLOR_ATTACHMENT1_WEBGL,
+            GL.DrawBuffers.COLOR_ATTACHMENT2_WEBGL]);
 //    gl.framebufferTexture2D(GL.FRAMEBUFFER, GL.DEPTH_ATTACHMENT, GL.TEXTURE_2D, this.depth_texture, 0);
     gl.framebufferRenderbuffer(GL.FRAMEBUFFER, GL.DEPTH_ATTACHMENT, GL.RENDERBUFFER, this.depth_buffer);
     gl.framebufferTexture2D(
@@ -202,6 +219,12 @@ class PMD_DeferredShader extends WebGLRenderer {
         GL.DrawBuffers.COLOR_ATTACHMENT1_WEBGL,
         GL.TEXTURE_2D,
         this.normal_texture,
+        0);
+    gl.framebufferTexture2D(
+        GL.FRAMEBUFFER,
+        GL.DrawBuffers.COLOR_ATTACHMENT2_WEBGL,
+        GL.TEXTURE_2D,
+        this.depth_texture,
         0);
 
     gl.bindTexture(GL.TEXTURE_2D, null);
