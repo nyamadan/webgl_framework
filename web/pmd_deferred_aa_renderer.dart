@@ -1,6 +1,6 @@
 part of mmd_renderer;
 
-class PMD_DeferredRenderer extends WebGLRenderer {
+class PMD_DeferredAaRenderer extends WebGLRenderer {
   static const String VS =
   """
   attribute vec3 position;
@@ -117,7 +117,7 @@ class PMD_DeferredRenderer extends WebGLRenderer {
     ]));
   }
 
-  PMD_DeferredRenderer(int width, int height)
+  PMD_DeferredAaRenderer(int width, int height)
   {
     this.initContext(width, height);
     this.initTrackball();
@@ -125,7 +125,7 @@ class PMD_DeferredRenderer extends WebGLRenderer {
     this._initialize();
   }
 
-  PMD_DeferredRenderer.copy(WebGLRenderer src) {
+  PMD_DeferredAaRenderer.copy(WebGLRenderer src) {
     this.gl = src.gl;
     this.dom = src.dom;
 

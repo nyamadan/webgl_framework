@@ -20,7 +20,7 @@ part 'pmd_main_shader.dart';
 part 'pmd_edge_shader.dart';
 
 part 'pmd_geometry_renderer.dart';
-part 'pmd_deferred_renderer.dart';
+part 'pmd_deferred_aa_renderer.dart';
 
 part 'motion_manager.dart';
 
@@ -64,6 +64,7 @@ class MMD_Renderer extends WebGLRenderer {
 
   bool enable_edge_shader = true;
   bool enable_deferred_shader = true;
+  bool enable_sraa = false;
   bool play = true;
 
   WebGLFBO fbo;
@@ -85,8 +86,8 @@ class MMD_Renderer extends WebGLRenderer {
   PMD_EdgeShader edge_shader;
 
   PMD_GeometryRenderer geometry_renderer;
-  PMD_DeferredRenderer deferred_renderer;
-  
+  PMD_DeferredAaRenderer deferred_aa_renderer;
+
   int frame;
   double start;
 
@@ -110,7 +111,7 @@ class MMD_Renderer extends WebGLRenderer {
     if (this.enable_deferred_shader) {
       GL.DrawBuffers glext = gl.getExtension("WEBGL_draw_buffers");
       this.geometry_renderer = new PMD_GeometryRenderer.copy(this, glext);
-      this.deferred_renderer = new PMD_DeferredRenderer.copy(this);
+      this.deferred_aa_renderer = new PMD_DeferredAaRenderer.copy(this);
     }
 
     this.fbo = new WebGLFBO(gl, width: this.dom.width, height: this.dom.height, depth_buffer_enabled: true);
@@ -624,11 +625,17 @@ class MMD_Renderer extends WebGLRenderer {
       this.geometry_renderer.mvp = mvp;
       this.geometry_renderer.render(elapsed);
 
-      gl.bindFramebuffer(GL.FRAMEBUFFER, null);
-      this.deferred_renderer.color_texture = this.geometry_renderer.color_texture;
-      this.deferred_renderer.normal_texture = this.geometry_renderer.normal_texture;
-      this.deferred_renderer.depth_texture = this.geometry_renderer.depth_texture;
-      this.deferred_renderer.render(elapsed);
+      if (this.enable_sraa) {
+        gl.bindFramebuffer(GL.FRAMEBUFFER, null);
+        this.deferred_aa_renderer.color_texture = this.geometry_renderer.color_texture;
+        this.deferred_aa_renderer.normal_texture = this.geometry_renderer.normal_texture;
+        this.deferred_aa_renderer.depth_texture = this.geometry_renderer.depth_texture;
+        this.deferred_aa_renderer.render(elapsed);
+      } else {
+        gl.bindFramebuffer(GL.FRAMEBUFFER, null);
+        this.copy_renderer.texture_buffer = this.geometry_renderer.color_texture;
+        this.copy_renderer.render(elapsed);
+      }
     } else {
       //setup shader
       gl.bindFramebuffer(GL.FRAMEBUFFER, this.fbo.buffer);

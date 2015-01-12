@@ -101,7 +101,7 @@ class PMD_GeometryRenderer extends WebGLRenderer {
 
     gl_FragData[0] = color;
     gl_FragData[1] = v_normal;
-    gl_FragData[2] = vec4(v_position.z / v_position.w);
+    gl_FragData[2] = vec4((v_position.z / v_position.w + 1.0) / 2.0);
   }
   """;
 
