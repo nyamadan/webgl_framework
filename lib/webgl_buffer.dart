@@ -108,3 +108,10 @@ class WebGLElementArrayBuffer32 implements WebGLBuffer {
     this.data = data;
   }
 }
+
+class WebGLMeshBuffer {
+  WebGLArrayBuffer32 position_buffer;
+  WebGLArrayBuffer32 normal_buffer;
+  WebGLArrayBuffer32 coord_buffer;
+  WebGLBuffer index_buffer;
+}

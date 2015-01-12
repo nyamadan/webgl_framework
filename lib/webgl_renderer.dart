@@ -65,7 +65,7 @@ abstract class WebGLRenderer
     this.trackball = new _Trackball(this.dom);
   }
 
-  Map<String, GL.UniformLocation> getUniformLocations(GL.Program program, List<String> uniform_names) {
+  Map<String, GL.UniformLocation> getUniformLocations(GL.Program program, Iterable<String> uniform_names) {
     var uniforms = new Map<String, GL.UniformLocation>();
 
     uniform_names.forEach((String name){
@@ -78,7 +78,7 @@ abstract class WebGLRenderer
     return uniforms;
   }
 
-  Map<String, int> getAttributes(GL.Program program, List<String> names) {
+  Map<String, int> getAttributes(GL.Program program, Iterable<String> names) {
     var attributes = new Map<String, int>();
     names.forEach((String name) {
       int attribute = gl.getAttribLocation(program, name);
