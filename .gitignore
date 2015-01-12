@@ -17,6 +17,9 @@ pubspec.lock
 #WebStrom
 .idea/
 
+#DartEditor
+.settings/
+
 web/model/
 web/motion/
 web/toon/

@@ -17,8 +17,7 @@ class GLTFTechniquePass {
               "uniform_names: ${this.uniform_names}",
               "uniform_locations: ${this.uniform_locations}",
               "enabled: ${this.enabled}",
-              "program: ${this.program}",
-              ].join(", "),
+              "program: ${this.program}",].join(", "),
           "}"].join("");
 }
 
@@ -70,7 +69,11 @@ class GLTFTechnique {
     return this;
   }
 
-  String toString() => ["{", ["key: ${this.key}", "parameters: ${this.parameters}", "pass: ${this.pass}", "passes: ${this.passes}"].join(", "), "}"].join("");
+  String toString() =>
+      [
+          "{",
+          ["key: ${this.key}", "parameters: ${this.parameters}", "pass: ${this.pass}", "passes: ${this.passes}"].join(", "),
+          "}"].join("");
 }
 
 class GLTFBufferView {
@@ -333,15 +336,10 @@ class GLTFParser extends WebGLRenderer {
     var future = completer.future;
 
     this._loadJson(base_path, path).then((Map<String, dynamic> response) {
-      var load_binary = this._loadBuffers(response, base_path).then((Map<String, GLTFBuffer> binarys) {
-        return new Future<Map<String, dynamic>>.value(binarys);
-      });
+      var load_buffers = this._loadBuffers(response, base_path);
+      var load_shaders = this._loadShaders(response, base_path);
 
-      var load_shader = this._loadShaders(response, base_path).then((Map<String, GLTFShader> shaders) {
-        return new Future<Map<String, dynamic>>.value(shaders);
-      });
-
-      return Future.wait([load_binary, load_shader]).then((List results) {
+      return Future.wait([load_buffers, load_shaders]).then((List results) {
         this.buffers = results[0];
         this.shaders = results[1];
 
