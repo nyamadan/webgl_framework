@@ -14,7 +14,7 @@ class PMD_DeferredAaRenderer extends WebGLRenderer {
 
   static const String FS =
   """
-  precision mediump float;
+  precision highp float;
 
   uniform sampler2D color_texture;
   uniform sampler2D normal_texture;
@@ -24,32 +24,30 @@ class PMD_DeferredAaRenderer extends WebGLRenderer {
 
   varying vec2 v_coord;
 
-  const float scale = 10.0;
+  const float scale = 300.0;
   const float depth_scale = 1.0;
   float bilateral(vec3 cn, float cz, vec3 n, float z) {
-    return exp(-scale * max(depth_scale * abs(cz - z), 1.0 - dot(cn, n)));
+    return exp(-scale * max(depth_scale * abs(cz - z), 1.0 - dot(cn * 0.5 + 1.0, n * 0.5 + 1.0)));
   }
 
   void main(void){
-    vec3 result = vec3(0.0);
-
     mat3 weights = mat3(0.0);
     for(int i1 = 0; i1 < 2; i1++) {
       for(int j1 = 0; j1 < 2; j1++) {
-        vec2 offset1 = vec2(delta.x * float(i1), delta.y * float(j1));
+        vec2 offset1 = vec2(delta.x * (float(i1) - 0.5), delta.y * (float(j1) - 0.5));
         mat3 tmp_weights = mat3(0.0);
         vec3 cn = texture2D(normal_texture, v_coord + offset1).rgb;
         float cz = texture2D(depth_texture, v_coord + offset1).r;
         float sum = 0.0;
         for(int i2 = -1; i2 <= 1; i2++) {
           for(int j2 = -1; j2 <= 1; j2++) {
-            if(abs(float(i1 + i2)) <= 1.0 && abs(float(j1 + j2)) <= 1.0) {
-              vec2 offset2 = offset1 + vec2(delta.x * float(i2), delta.y * float(j2));
+            vec2 offset2 = vec2(delta.x * float(i2), delta.y * float(j2));
+            if(abs(offset1.x - offset2.x) <= delta.x && abs(offset1.y - offset2.y) <= delta.y) {
               vec3 n = texture2D(normal_texture, v_coord + offset2).rgb * 2.0;
               float z = texture2D(depth_texture, v_coord + offset2).r;
   
               float w = bilateral(cn, cz, n, z);
-              tmp_weights[i1 + i2 + 1][j1 + j2 + 1] = w;
+              tmp_weights[i2 + 1][j2 + 1] = w;
               sum += w;
             }
           }
@@ -63,14 +61,21 @@ class PMD_DeferredAaRenderer extends WebGLRenderer {
       }
     }
 
+    vec4 result = vec4(0.0);
     for(int i = 0; i < 3; i++) {
       for(int j = 0; j < 3; j++) {
         vec2 offset = vec2(delta.x * float(i - 1), delta.y * float(j - 1));
-        result += weights[i][j] * 0.25 *  texture2D(color_texture, v_coord + offset).rgb;
+        result += weights[i][j] * 0.25 *  texture2D(color_texture, v_coord + offset);
       }
     }
 
-    gl_FragColor = vec4(result, 1.0);
+    //vec3 cn = texture2D(normal_texture, v_coord).rgb;
+    //vec3 n = texture2D(normal_texture, v_coord + vec2(delta.x, 0.0)).rgb;
+    //float cz = texture2D(depth_texture, v_coord).r;
+    //float z = texture2D(depth_texture, v_coord + vec2(delta.x, 0.0)).r;
+    //gl_FragColor = vec4(vec3(bilateral(cn, cz, cn, cz)), 1.0);
+    //gl_FragColor = vec4(weights[1], 1.0);
+    gl_FragColor = result;
   }
   """;
 

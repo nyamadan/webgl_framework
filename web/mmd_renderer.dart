@@ -64,7 +64,7 @@ class MMD_Renderer extends WebGLRenderer {
 
   bool enable_edge_shader = true;
   bool enable_deferred_shader = true;
-  bool enable_sraa = false;
+  bool enable_sraa = true;
   bool play = true;
 
   WebGLFBO fbo;
@@ -585,7 +585,7 @@ class MMD_Renderer extends WebGLRenderer {
     }
 
     Matrix4 projection = new Matrix4.identity();
-    setPerspectiveMatrix(projection, Math.PI * 60.0 / 180.0, this.aspect, 0.1, 100.0);
+    setPerspectiveMatrix(projection, Math.PI * 60.0 / 180.0, this.aspect, 1.0, 100.0);
 
     Matrix4 view = new Matrix4.identity();
     Vector3 look_from = new Vector3(0.0, 0.0, 5.0 + 45.0 * this.trackball.value);
