@@ -24,7 +24,7 @@ class PMD_DeferredAaRenderer extends WebGLRenderer {
 
   varying vec2 v_coord;
 
-  const float scale = 300.0;
+  const float scale = 50.0;
   const float depth_scale = 1.0;
   float bilateral(vec3 cn, float cz, vec3 n, float z) {
     return exp(-scale * max(depth_scale * abs(cz - z), 1.0 - dot(cn * 0.5 + 1.0, n * 0.5 + 1.0)));
@@ -61,21 +61,18 @@ class PMD_DeferredAaRenderer extends WebGLRenderer {
       }
     }
 
-    vec4 result = vec4(0.0);
-    for(int i = 0; i < 3; i++) {
-      for(int j = 0; j < 3; j++) {
-        vec2 offset = vec2(delta.x * float(i - 1), delta.y * float(j - 1));
-        result += weights[i][j] * 0.25 *  texture2D(color_texture, v_coord + offset);
+    if(weights[1][1] >= 0.99) {
+      gl_FragColor = vec4(texture2D(color_texture, v_coord).rgb, 1.0);
+    } else {
+      vec4 result = vec4(0.0);
+      for(int i = 0; i < 3; i++) {
+        for(int j = 0; j < 3; j++) {
+          vec2 offset = vec2(delta.x * float(i - 1), delta.y * float(j - 1));
+          result += weights[i][j] * 0.25 *  texture2D(color_texture, v_coord + offset);
+        }
       }
+      gl_FragColor = vec4(result.rgb, 1.0);
     }
-
-    //vec3 cn = texture2D(normal_texture, v_coord).rgb;
-    //vec3 n = texture2D(normal_texture, v_coord + vec2(delta.x, 0.0)).rgb;
-    //float cz = texture2D(depth_texture, v_coord).r;
-    //float z = texture2D(depth_texture, v_coord + vec2(delta.x, 0.0)).r;
-    //gl_FragColor = vec4(vec3(bilateral(cn, cz, cn, cz)), 1.0);
-    //gl_FragColor = vec4(weights[1], 1.0);
-    gl_FragColor = result;
   }
   """;
 

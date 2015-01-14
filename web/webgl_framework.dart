@@ -27,6 +27,7 @@ void main() {
 
   document.querySelector("body").append(renderer.dom);
 
+  //setup frame ui
   var frame_slider_element = document.querySelector("#frame-slider") as InputElement;
   var frame_element = document.querySelector("#frame") as InputElement;
   var play = document.querySelector("#play") as InputElement;
@@ -64,6 +65,17 @@ void main() {
     }
   });
 
+  //setup sraa ui
+  var sraa = document.querySelector("#sraa") as InputElement;
+
+  sraa.onChange.listen((event){
+    if(sraa.checked) {
+      renderer.enable_sraa = true;
+    } else {
+      renderer.enable_sraa = false;
+    }
+  });
+  
   void render(double ms) {
     window.requestAnimationFrame(render);
 
