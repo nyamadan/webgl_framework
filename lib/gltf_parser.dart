@@ -1,9 +1,193 @@
 part of webgl_framework;
 
+class GLTFAccessor {
+  String key;
+  GLTFBufferView buffer_view;
+  int byte_offset;
+  int byte_stride;
+  int component_type;
+  int count;
+  String type;
+
+  GLTFAccessor parse(Map<String, dynamic> response, Map<String, GLTFBufferView> buffer_views, String key) {
+    Map<String, dynamic> response_accessor = response["accessors"][key];
+    this.key = key;
+    this.buffer_view = buffer_views[response_accessor["bufferView"] as String];
+    this.byte_offset = response_accessor["byteOffset"];
+    this.byte_stride = response_accessor["byteStride"];
+    this.component_type = response_accessor["componentType"];
+    this.count = response_accessor["count"];
+    this.type = response_accessor["type"];
+    return this;
+  }
+
+  String toString() =>
+      [
+          "{",
+          [
+              "key: ${this.key}",
+              "buffer_view: ${this.buffer_view}",
+              "byte_offset: ${this.byte_offset}",
+              "byte_stride: ${this.byte_stride}",
+              "count: ${this.component_type}",
+              "type: ${this.type}",].join(", "),
+          "}"].join("");
+}
+
+
+class GLTFMaterialTechnique {
+  GLTFTechnique technique;
+  Map<String, dynamic> values;
+
+  GLTFMaterialTechnique parse(Map<String, dynamic> response_material, Map<String, GLTFTechnique> techniques) {
+    var response_technique = response_material["instanceTechnique"] as Map<String, dynamic>;
+    this.technique = techniques[response_technique["technique"] as String];
+
+    var response_values = response_technique["values"] as Map<String, dynamic>;
+    this.values = new Map<String, dynamic>();
+    response_values.forEach((String key, dynamic value) {
+      GLTFTechniqueParameter parameter = this.technique.parameters[key];
+      
+      switch(parameter.type) {
+        case GL.FLOAT_VEC4:
+          this.values[key] = new Vector4(value[0] * 1.0, value[1] * 1.0, value[2] * 1.0, value[3] * 1.0);
+          return;
+        case GL.FLOAT_VEC2:
+          this.values[key] = new Vector3(value[0] * 1.0, value[1] * 1.0, value[2] * 1.0);
+          return;
+        case GL.FLOAT_VEC2:
+          this.values[key] = new Vector2(value[0] * 1.0, value[1] * 1.0);
+          return;
+        case GL.FLOAT:
+          this.values[key] = value;
+          return;
+      }
+
+      throw (new Exception("Unknown value type"));
+    });
+    return this;
+  }
+
+  String toString() => ["{", ["technique: ${this.technique}", "values: ${this.values}",].join(", "), "}"].join("");
+}
+
+class GLTFMaterial {
+  String key;
+  String name;
+  GLTFMaterialTechnique instance_technique;
+
+  GLTFMaterial parse(Map<String, dynamic> response, Map<String, GLTFTechnique> techniques, String key) {
+    Map<String, dynamic> response_material = response["materials"][key];
+    this.key = key;
+    this.name = response_material["name"];
+    this.instance_technique = new GLTFMaterialTechnique();
+    this.instance_technique.parse(response_material, techniques);
+    return this;
+  }
+  String toString() =>
+      [
+          "{",
+          ["key: ${this.key}", "name: ${this.name}", "instance_technique: ${this.instance_technique}",].join(", "),
+          "}"].join("");
+}
+
+class GLTFMeshPrimitive {
+  Map<String, GLTFAccessor> attributes;
+  GLTFAccessor indices;
+  GLTFMaterial material;
+  int primitive;
+
+  GLTFMeshPrimitive parse(Map<String, dynamic> response_primitive, Map<String, GLTFAccessor> accessors, Map<String,
+      GLTFMaterial> materials) {
+
+    this.primitive = response_primitive["primitive"];
+    this.indices = accessors[response_primitive["indices"] as String];
+    this.material = materials[response_primitive["material"] as String];
+    this.attributes = new Map<String, GLTFAccessor>();
+    (response_primitive["attributes"] as Map<String, String>).forEach((String key, String value) {
+      this.attributes[key] = accessors[value];
+    });
+    return this;
+  }
+
+  String toString() =>
+      [
+          "{",
+          [
+              "attributes: ${this.attributes}",
+              "indices: ${this.indices}",
+              "material: ${this.material}",
+              "primitive: ${this.primitive}",].join(", "),
+          "}"].join("");
+}
+
+class GLTFMesh {
+  String key;
+  String name;
+  List<GLTFMeshPrimitive> primitives;
+
+  GLTFMesh parse(Map<String, dynamic> response, Map<String, GLTFAccessor> accessors, Map<String,
+      GLTFMaterial> materials, String key) {
+    Map<String, dynamic> response_mesh = response["meshes"][key];
+
+    this.key = key;
+    this.name = response_mesh["name"];
+    this.primitives =
+        (response_mesh["primitives"] as List<Map<String, dynamic>>).map((Map<String, dynamic> response_primitive) {
+      var primitive = new GLTFMeshPrimitive();
+      primitive.parse(response_primitive, accessors, materials);
+      return primitive;
+    }).toList();
+    return this;
+  }
+
+  String toString() =>
+      ["{", ["key: ${this.key}", "name: ${this.name}", "primitives: ${this.primitives}",].join(", "), "}"].join("");
+}
+
+class GLTFNode {
+  String key;
+  String name;
+  Matrix4 matrix;
+  List<GLTFMesh> meshes;
+  List<GLTFNode> children;
+
+  GLTFNode parse(Map<String, dynamic> response, Map<String, GLTFNode> nodes, Map<String, GLTFMesh> meshes, String key) {
+    Map<String, dynamic> response_node = response["nodes"][key];
+    List<String> response_meshes = response_node["meshes"];
+
+    this.key = key;
+    this.name = response_node["name"];
+    if(response_meshes != null) {
+      this.meshes = response_meshes.map((String key) => meshes[key]).toList();
+    }
+    this.matrix = new Matrix4.fromFloat32List(
+        new Float32List.fromList((response_node["matrix"] as List<num>).map((num x) => x * 1.0).toList()));
+    return this;
+  }
+
+  String toString() =>
+      [
+          "{",
+          [
+              "key: ${this.key}",
+              "name: ${this.name}",
+              "matrix: ${this.matrix}",
+              "meshes: ${this.meshes}",
+              "children: ${this.children}",].join(", "),
+          "}"].join("");
+}
+
+class GLTFScene {
+  String key;
+  List<GLTFNode> nodes;
+  String toString() => ["{", ["key: ${this.key}", "nodes: ${this.nodes}",].join(", "), "}"].join("");
+}
+
 class GLTFTechniquePass {
   String key;
-  Map<String, String> attribute_names;
-  Map<String, String> uniform_names;
+  Map<String, GLTFTechniqueParameter> attributes;
+  Map<String, GLTFTechniqueParameter> uniforms;
   Map<String, GL.UniformLocation> uniform_locations;
   GLTFProgram program;
   List<int> enabled;
@@ -13,8 +197,8 @@ class GLTFTechniquePass {
           "{",
           [
               "key: ${this.key}",
-              "attribute_names: ${this.attribute_names}",
-              "uniform_names: ${this.uniform_names}",
+              "attributes: ${this.attributes}",
+              "uniforms: ${this.uniforms}",
               "uniform_locations: ${this.uniform_locations}",
               "enabled: ${this.enabled}",
               "program: ${this.program}",].join(", "),
@@ -40,7 +224,7 @@ class GLTFTechnique {
     Map<String, dynamic> response_technique = response["techniques"][key];
 
     this.key = key;
-    
+
     this.parameters = new Map<String, GLTFTechniqueParameter>();
     (response_technique["parameters"] as Map<String, Map<String, dynamic>>).forEach(
         (String key, Map<String, dynamic> response_parameter) {
@@ -57,13 +241,21 @@ class GLTFTechnique {
       var response_program = response_pass["instanceProgram"];
       var pass = new GLTFTechniquePass();
       pass.key = key;
-      pass.uniform_names = response_program["uniforms"];
-      pass.attribute_names = response_program["attributes"];
+
+      pass.uniforms = new Map<String, GLTFTechniqueParameter>();
+      (response_program["uniforms"] as Map<String, String>).forEach((String uniform_name, String parameter_key){
+        pass.uniforms[uniform_name] = this.parameters[parameter_key];
+      });
+      
+      pass.attributes = new Map<String, GLTFTechniqueParameter>();
+      (response_program["attributes"] as Map<String, String>).forEach((String attribute_name, String parameter_key){
+        pass.attributes[attribute_name] = this.parameters[parameter_key];
+      });
       pass.program = programs[response_program["program"]];
       pass.enabled = response_pass["states"]["enable"];
       this.passes[key] = pass;
     });
-    
+
     this.pass = this.passes[response_technique["pass"]];
 
     return this;
@@ -80,7 +272,9 @@ class GLTFBufferView {
   String key;
   GLTFBuffer buffer;
   int target;
-  List view;
+  TypedData view;
+  
+  GL.Buffer gl_buffer;
 
   GLTFBufferView parse(Map<String, dynamic> response, Map<String, GLTFBuffer> buffers, String key) {
     Map<String, dynamic> response_buffer_view = response["bufferViews"][key];
@@ -103,7 +297,7 @@ class GLTFBufferView {
   }
 
   String toString() =>
-      ["{", ["key: ${this.key}", "target: ${this.target}", "buffer: ${this.buffer}",].join(", "), "}"].join("");
+      ["{", ["key: ${this.key}", "target: ${this.target}", "buffer: ${this.buffer}", "gl_buffer: ${this.gl_buffer}",].join(", "), "}"].join("");
 }
 
 
@@ -141,7 +335,7 @@ class GLTFBuffer {
   String toString() =>
       [
           "{",
-          ["key: ${this.key}", "type: ${this.type}", "buffer: ${this.buffer}", "uri: ${this.uri}",].join(", "),
+          ["key: ${this.key}", "type: ${this.type}", "buffer: ${this.buffer}", "uri: ${this.uri}", ].join(", "),
           "}"].join("");
 }
 
@@ -188,13 +382,13 @@ class GLTFShader {
 
 class GLTFProgram {
   String key;
-  GL.Program program;
+  GL.Program gl_program;
 
   GLTFShader fragment_shader;
   GLTFShader vertex_shader;
 
-  Map<String, int> attributes;
-  List<String> attribute_names;
+  Map<String, int> gl_attributes;
+  List<String> attributes;
 
   GLTFProgram parse(Map<String, dynamic> response, Map<String, GLTFShader> shaders, String key) {
     Map<String, dynamic> response_program = response["programs"][key];
@@ -202,7 +396,7 @@ class GLTFProgram {
     this.key = key;
     this.fragment_shader = shaders[response_program["fragmentShader"]];
     this.vertex_shader = shaders[response_program["vertexShader"]];
-    this.attribute_names = response_program["attributes"];
+    this.attributes = response_program["attributes"];
     return this;
   }
 
@@ -213,9 +407,9 @@ class GLTFProgram {
               "key: ${this.key}",
               "vertex_shader: ${this.vertex_shader}",
               "fragment_shader: ${this.fragment_shader}",
-              "attribute_names: ${this.attribute_names}",
               "attributes: ${this.attributes}",
-              "program: ${this.program}",].join(", "),
+              "gl_attributes: ${this.gl_attributes}",
+              "gl_program: ${this.gl_program}",].join(", "),
           "}"].join("");
 }
 
@@ -311,7 +505,6 @@ class GLTFParser extends WebGLRenderer {
     response["bufferViews"].keys.forEach((String key) {
       var buffer_view = new GLTFBufferView();
       buffer_view.parse(response, buffers, key);
-
       buffer_views[key] = buffer_view;
     });
 
@@ -329,6 +522,65 @@ class GLTFParser extends WebGLRenderer {
     });
 
     return techniques;
+  }
+
+  Map<String, GLTFMaterial> materials;
+  Map<String, GLTFMaterial> _getMaterials(Map<String, dynamic> response, Map<String, GLTFTechnique> techniques) {
+    var materials = new Map<String, GLTFMaterial>();
+    var response_materials = response["materials"] as Map<String, Map<String, dynamic>>;
+
+    response_materials.forEach((String key, Map<String, dynamic> response_material) {
+      var material = new GLTFMaterial();
+      material.parse(response, techniques, key);
+      materials[key] = material;
+    });
+
+    return materials;
+  }
+
+  Map<String, GLTFAccessor> accessors;
+  Map<String, GLTFAccessor> _getAccessors(Map<String, dynamic> response, Map<String, GLTFBufferView> buffer_views) {
+    var accessors = new Map<String, GLTFAccessor>();
+    var response_accessors = response["accessors"] as Map<String, Map<String, dynamic>>;
+
+    response_accessors.forEach((String key, Map<String, dynamic> response_accessor) {
+      var accessor = new GLTFAccessor();
+      accessor.parse(response, buffer_views, key);
+      accessors[key] = accessor;
+    });
+
+    return accessors;
+  }
+
+  Map<String, GLTFMesh> meshes;
+  Map<String, GLTFMesh> _getMeshes(Map<String, dynamic> response, Map<String, GLTFAccessor> accessors, Map<String, GLTFMaterial> materials) {
+    var meshes = new Map<String, GLTFMesh>();
+    var response_meshes = response["meshes"] as Map<String, Map<String, dynamic>>;
+
+    response_meshes.forEach((String key, Map<String, dynamic> response_mesh) {
+      var mesh = new GLTFMesh();
+      mesh.parse(response, accessors, materials, key);
+      meshes[key] = mesh;
+    });
+
+    return meshes;
+  }
+  
+  Map<String, GLTFNode> nodes;
+  Map<String, GLTFNode> _getNodes(Map<String, dynamic> response, Map<String, GLTFMesh> meshes) {
+    var response_nodes = response["nodes"] as Map<String, Map<String, dynamic>>;
+    
+    var nodes = new Map<String, GLTFNode>();
+    response_nodes.keys.forEach((String key) {
+      var node = new GLTFNode();
+      nodes[key] = node;
+    });
+
+    response_nodes.forEach((String key, Map<String, dynamic> response_node) {
+      nodes[key].parse(response, nodes, meshes, key);
+    });
+
+    return nodes;
   }
 
   Future<GLTFParser> load(String base_path, String path) {
@@ -349,9 +601,14 @@ class GLTFParser extends WebGLRenderer {
       this.buffer_views = this._getBufferViews(response, this.buffers);
       this.programs = this._getPrograms(response, this.shaders);
       this.techniques = this._getTechniques(response, this.programs);
+      this.materials = this._getMaterials(response, this.techniques);
+      this.accessors = this._getAccessors(response, this.buffer_views);
+      this.meshes = this._getMeshes(response, this.accessors, this.materials);
+      this.nodes = this._getNodes(response, this.meshes);
       this.compileShaders();
       this.linkPrograms();
       this.setupTechniques();
+      this.createBuffers();
       completer.complete(this);
     });
     return future;
@@ -372,19 +629,28 @@ class GLTFParser extends WebGLRenderer {
 
   void linkPrograms() {
     this.programs.values.forEach((GLTFProgram program) {
-      program.program = this.linkProgram(program.vertex_shader.shader, program.fragment_shader.shader);
-      program.attributes = this.getAttributes(program.program, program.attribute_names);
+      program.gl_program = this.linkProgram(program.vertex_shader.shader, program.fragment_shader.shader);
+      program.gl_attributes = this.getAttributes(program.gl_program, program.attributes);
     });
   }
 
   void setupTechniques() {
     this.techniques.values.forEach((GLTFTechnique technique) {
       technique.passes.values.forEach((GLTFTechniquePass pass) {
-        pass.uniform_locations = this.getUniformLocations(pass.program.program, pass.uniform_names.keys);
+        pass.uniform_locations = this.getUniformLocations(pass.program.gl_program, pass.uniforms.keys);
       });
     });
   }
 
+  void createBuffers() {
+    this.buffer_views.values.forEach((GLTFBufferView buffer_view) {
+      buffer_view.gl_buffer = gl.createBuffer();
+      gl.bindBuffer(buffer_view.target, buffer_view.gl_buffer);
+      gl.bufferDataTyped(buffer_view.target, buffer_view.view, GL.STATIC_DRAW);
+      gl.bindBuffer(buffer_view.target, null);
+    });
+  }
+  
   void render(double elapsed) {
   }
 }
