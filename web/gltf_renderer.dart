@@ -82,6 +82,8 @@ class GLTFRenderer extends WebGLRenderer {
                     accessor.byte_stride,
                     accessor.byte_offset);
                 break;
+              default:
+                throw(new Exception("Unknown Type"));
             }
           });
 
@@ -101,6 +103,11 @@ class GLTFRenderer extends WebGLRenderer {
                 gl.uniform2fv(
                     pass.uniform_locations[uniform_name],
                     (material.instance_technique.values[parameter.key] as Vector2).storage);
+                break;
+              case GL.FLOAT:
+                gl.uniform1f(
+                    pass.uniform_locations[uniform_name],
+                    material.instance_technique.values[parameter.key]);
                 break;
               case GL.FLOAT_MAT4:
                 switch (parameter.semantic) {
@@ -140,6 +147,13 @@ class GLTFRenderer extends WebGLRenderer {
                     false,
                     (material.instance_technique.values[parameter.key] as Matrix2).storage);
                 break;
+
+              case GL.SAMPLER_2D:
+                //Not implemented
+                break;
+                
+              default:
+                throw(new Exception("Unknown Type"));
             }
           });
 

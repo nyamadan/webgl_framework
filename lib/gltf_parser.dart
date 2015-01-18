@@ -62,6 +62,9 @@ class GLTFMaterialTechnique {
         case GL.FLOAT:
           this.values[key] = value;
           return;
+        case GL.SAMPLER_2D:
+          this.values[key] = value;
+          return;
       }
 
       throw (new Exception("Unknown value type"));
@@ -165,7 +168,6 @@ class GLTFNode {
     }
     this.matrix = new Matrix4.fromFloat32List(
         new Float32List.fromList((response_node["matrix"] as List<num>).map((num x) => x * 1.0).toList()));
-    this.matrix.transpose();
     
     if (response_children != null) {
       this.children = response_children.map((String child_name) => nodes[child_name]).toList();
