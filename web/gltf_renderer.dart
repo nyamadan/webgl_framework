@@ -27,12 +27,13 @@ class GLTFRenderer extends WebGLRenderer {
     this._initialize();
   }
 
-  void _renderNode(GLTFNode node, Matrix4 matrix) {
+  void _renderNode(GLTFNode node, Matrix4 model, Matrix4 view, Matrix4 projection, Matrix3 normal, Matrix4 matrix) {
     matrix = matrix * node.matrix;
 
     if (node.children != null) {
-      node.children.forEach((GLTFNode child) => this._renderNode(child, matrix));
+      node.children.forEach((GLTFNode child) => this._renderNode(child, model, view, projection, normal, matrix));
     }
+
 
     if (node.meshes != null) {
       GLTFProgram current_program;
@@ -58,7 +59,7 @@ class GLTFRenderer extends WebGLRenderer {
                 gl.vertexAttribPointer(
                     program.gl_attributes[attribute_name],
                     1,
-                    GL.FLOAT,
+                    accessor.component_type,
                     false,
                     accessor.byte_stride,
                     accessor.byte_offset);
@@ -67,7 +68,7 @@ class GLTFRenderer extends WebGLRenderer {
                 gl.vertexAttribPointer(
                     program.gl_attributes[attribute_name],
                     2,
-                    GL.FLOAT,
+                    accessor.component_type,
                     false,
                     accessor.byte_stride,
                     accessor.byte_offset);
@@ -76,54 +77,76 @@ class GLTFRenderer extends WebGLRenderer {
                 gl.vertexAttribPointer(
                     program.gl_attributes[attribute_name],
                     3,
-                    GL.FLOAT,
+                    accessor.component_type,
                     false,
                     accessor.byte_stride,
                     accessor.byte_offset);
                 break;
             }
-
-            pass.uniforms.forEach((String uniform_name, GLTFTechniqueParameter parameter) {
-              switch (parameter.type) {
-                case GL.FLOAT_VEC4:
-                  gl.uniform4fv(
-                      pass.uniform_locations[uniform_name],
-                      (material.instance_technique.values[parameter.key] as Vector4).storage);
-                  break;
-                case GL.FLOAT_VEC3:
-                  gl.uniform3fv(
-                      pass.uniform_locations[uniform_name],
-                      (material.instance_technique.values[parameter.key] as Vector3).storage);
-                  break;
-                case GL.FLOAT_VEC2:
-                  gl.uniform2fv(
-                      pass.uniform_locations[uniform_name],
-                      (material.instance_technique.values[parameter.key] as Vector2).storage);
-                  break;
-                case GL.FLOAT_MAT4:
-                  gl.uniformMatrix4fv(
-                      pass.uniform_locations[uniform_name],
-                      false,
-                      (material.instance_technique.values[parameter.key] as Matrix4).storage);
-                  break;
-                case GL.FLOAT_MAT3:
-                  gl.uniformMatrix3fv(
-                      pass.uniform_locations[uniform_name],
-                      false,
-                      (material.instance_technique.values[parameter.key] as Matrix3).storage);
-                  break;
-                case GL.FLOAT_MAT2:
-                  gl.uniformMatrix2fv(
-                      pass.uniform_locations[uniform_name],
-                      false,
-                      (material.instance_technique.values[parameter.key] as Matrix2).storage);
-                  break;
-              }
-            });
           });
+
+          pass.uniforms.forEach((String uniform_name, GLTFTechniqueParameter parameter) {
+            switch (parameter.type) {
+              case GL.FLOAT_VEC4:
+                gl.uniform4fv(
+                    pass.uniform_locations[uniform_name],
+                    (material.instance_technique.values[parameter.key] as Vector4).storage);
+                break;
+              case GL.FLOAT_VEC3:
+                gl.uniform3fv(
+                    pass.uniform_locations[uniform_name],
+                    (material.instance_technique.values[parameter.key] as Vector3).storage);
+                break;
+              case GL.FLOAT_VEC2:
+                gl.uniform2fv(
+                    pass.uniform_locations[uniform_name],
+                    (material.instance_technique.values[parameter.key] as Vector2).storage);
+                break;
+              case GL.FLOAT_MAT4:
+                switch (parameter.semantic) {
+                  case "MODELVIEW":
+                    gl.uniformMatrix4fv(
+                        pass.uniform_locations[uniform_name],
+                        false,
+                        ((view * model * matrix) as Matrix4).storage);
+                    break;
+                  case "PROJECTION":
+                    gl.uniformMatrix4fv(pass.uniform_locations[uniform_name], false, projection.storage);
+                    break;
+                  default:
+                    gl.uniformMatrix4fv(
+                        pass.uniform_locations[uniform_name],
+                        false,
+                        (material.instance_technique.values[parameter.key] as Matrix4).storage);
+                    break;
+                }
+                break;
+              case GL.FLOAT_MAT3:
+                switch (parameter.semantic) {
+                  case "MODELVIEWINVERSETRANSPOSE":
+                    gl.uniformMatrix3fv(pass.uniform_locations[uniform_name], false, normal.storage);
+                    break;
+                  default:
+                    gl.uniformMatrix3fv(
+                        pass.uniform_locations[uniform_name],
+                        false,
+                        (material.instance_technique.values[parameter.key] as Matrix3).storage);
+                    break;
+                }
+                break;
+              case GL.FLOAT_MAT2:
+                gl.uniformMatrix2fv(
+                    pass.uniform_locations[uniform_name],
+                    false,
+                    (material.instance_technique.values[parameter.key] as Matrix2).storage);
+                break;
+            }
+          });
+
+          gl.bindBuffer(primitive.indices.buffer_view.target, primitive.indices.buffer_view.gl_buffer);
+          gl.drawElements(primitive.primitive, primitive.indices.count, primitive.indices.component_type, 0);
         });
       });
-
     }
   }
 
@@ -132,21 +155,21 @@ class GLTFRenderer extends WebGLRenderer {
     setPerspectiveMatrix(projection, Math.PI * 60.0 / 180.0, this.aspect, 0.1, 1000.0);
 
     Matrix4 view = new Matrix4.identity();
-    Vector3 look_from = new Vector3(0.0, 0.0, 30.0 + 100.0 * this.trackball.value);
+    Vector3 look_from = new Vector3(0.0, 0.0, 3.0 + 10.0 * this.trackball.value);
     setViewMatrix(view, look_from, new Vector3(0.0, 0.0, 0.0), new Vector3(0.0, 1.0, 0.0));
 
     Matrix4 model = new Matrix4.identity();
     model.setRotation(this.trackball.rotation.asRotationMatrix());
 
-    Matrix4 mvp = projection * view * model;
+    Matrix3 normal = new Matrix3.identity();
 
     gl.viewport(0, 0, this.dom.width, this.dom.height);
     gl.enable(GL.DEPTH_TEST);
     gl.clearColor(0.5, 0.5, 0.5, 1.0);
     gl.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
     if (this._gltf != null) {
-      this._gltf.nodes.forEach((String key, GLTFNode node) {
-        this._renderNode(node, mvp);
+      this._gltf.scene.nodes.forEach((GLTFNode node) {
+        this._renderNode(node, model, view, projection, normal, new Matrix4.identity());
       });
     }
   }
