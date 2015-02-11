@@ -9,7 +9,7 @@ class GLTFRenderer extends WebGLRenderer {
   GLTFParser _gltf;
   void _initialize() {
     var gltf = new GLTFParser.copy(this);
-    gltf.load("model", "fighter.gltf").then((GLTFParser gltf) {
+    gltf.load("../model", "fighter.gltf").then((GLTFParser gltf) {
       this._gltf = gltf;
     });
   }

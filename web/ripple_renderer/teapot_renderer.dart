@@ -4,10 +4,10 @@ import "dart:web_gl" as GL;
 import "dart:math" as Math;
 import "package:vector_math/vector_math.dart";
 import "package:webgl_framework/webgl_framework.dart";
-import "teapot.dart" as teapot;
+import '../teapot.dart' as teapot;
 
 import "ripple_renderer.dart";
-import "copy_renderer.dart";
+import '../copy_renderer.dart';
 
 class TeapotRenderer extends WebGLRenderer {
   static const String VS = """
