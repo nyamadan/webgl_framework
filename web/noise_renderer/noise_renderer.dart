@@ -115,7 +115,6 @@ class NoiseRenderer extends WebGLRenderer {
       1, 2, 3,
     ]));
     
-    this.texture = new WebGLCanvasTexture(gl, flip_y: true, wrap_s: GL.CLAMP_TO_EDGE, wrap_t: GL.CLAMP_TO_EDGE, width: 512, height: 512);
     this._initializeFBO();
     
     var futures = new List<Future<ImageElement>>();
@@ -143,10 +142,16 @@ class NoiseRenderer extends WebGLRenderer {
       futures.add(completer.future);
       return;
     });
-    
+
     Future.wait(futures).then((List<ImageElement> images){
       this.images = images;
-      this.ready = true;
+    })
+    .then((_) {
+      this.texture = new WebGLCanvasTexture(gl, flip_y: true, wrap_s: GL.CLAMP_TO_EDGE, wrap_t: GL.CLAMP_TO_EDGE);
+      return this.texture.load(gl, "pattern.jpg");
+    })
+    .then((_){ 
+      this.ready = true;     
     });
   }
 
