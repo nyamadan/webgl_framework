@@ -29,7 +29,7 @@ class NoiseRenderer extends WebGLRenderer {
 
   void main(void){
     float w = 0.5 * exp(-pow(uv.y - 0.5, 2.0) * 30.0);
-    float noise = snoise(vec3(0.0, uv.y * 50.0, t)) * exp(-pow(abs(mod(t, 1.0) * 2.0 - 1.0), 2.0) * 20.0);
+    float noise = snoise(vec2(uv.y * 50.0, t)) * exp(-pow(abs(mod(t, 1.0) * 2.0 - 1.0), 2.0) * 20.0);
     vec2 s = vec2((uv.x * 1.5) - 0.25 + (4.0 * noise * w), uv.y * 1.5 - 0.25);
     vec3 color = vec3(0.0);
     if(s.x < 1.0 && s.x > 0.0 && s.y < 1.0 && s.y > 0.0) {
@@ -88,7 +88,7 @@ class NoiseRenderer extends WebGLRenderer {
     var vs = this.compileVertexShader(VS);
     var fs = this.compileFragmentShader([
       "precision mediump float;",
-      _NOISE_3D,
+      _NOISE_2D,
       FS,
     ].join("\n"));
     this.program = this.linkProgram(vs, fs);
