@@ -284,6 +284,9 @@ class WebGLCanvasTexture {
   int internal_format;
   int format;
   int type;
+  
+  int wrap_s;
+  int wrap_t;
 
   WebGLCanvasTexture(GL.RenderingContext gl, {
     int width : 256,
@@ -292,6 +295,8 @@ class WebGLCanvasTexture {
     int internal_format : GL.RGBA,
     int format : GL.RGBA,
     int type : GL.UNSIGNED_BYTE,
+    int wrap_s : GL.MIRRORED_REPEAT,
+    int wrap_t : GL.MIRRORED_REPEAT,
     Vector4 color
   }){
     this.flip_y = flip_y;
@@ -302,6 +307,9 @@ class WebGLCanvasTexture {
     this.canvas = document.createElement("canvas");
     this.canvas.width = width;
     this.canvas.height = height;
+    
+    this.wrap_s = wrap_s;
+    this.wrap_t = wrap_t;
 
     this.ctx = this.canvas.getContext("2d");
     if(color != null) {
@@ -315,8 +323,8 @@ class WebGLCanvasTexture {
     } else {
       gl.pixelStorei(GL.UNPACK_FLIP_Y_WEBGL, 0);
     }
-    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, GL.MIRRORED_REPEAT);
-    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.MIRRORED_REPEAT);
+    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, this.wrap_s);
+    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, this.wrap_t);
     gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.LINEAR);
     gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.LINEAR);
     gl.texImage2DCanvas(GL.TEXTURE_2D, 0, this.internal_format, this.format, this.type, this.canvas);
@@ -360,8 +368,8 @@ class WebGLCanvasTexture {
     } else {
       gl.pixelStorei(GL.UNPACK_FLIP_Y_WEBGL, 0);
     }
-    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, GL.MIRRORED_REPEAT);
-    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.MIRRORED_REPEAT);
+    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, this.wrap_s);
+    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, this.wrap_t);
     gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.LINEAR);
     gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.LINEAR);
     gl.texImage2DCanvas(GL.TEXTURE_2D, 0, this.internal_format, this.format, this.type, this.canvas);

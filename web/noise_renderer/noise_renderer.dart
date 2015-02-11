@@ -1,8 +1,10 @@
 library noise_renderer;
 
+import 'dart:js';
+import 'dart:html';
 import "dart:web_gl" as GL;
 import "dart:typed_data";
-import "package:vector_math/vector_math.dart";
+import "dart:async";
 import "package:webgl_framework/webgl_framework.dart";
 
 part "noise_2d.dart";
@@ -26,9 +28,14 @@ class NoiseRenderer extends WebGLRenderer {
   varying vec2 uv;
 
   void main(void){
-    vec4 color = texture2D(texture, uv);
-    float noise = 0.5 * snoise(vec3(uv * 5.0, t)) + 1.0;
-    gl_FragColor = vec4(vec3(noise), 1.0);
+    float w = 0.5 * exp(-pow(uv.y - 0.5, 2.0) * 30.0);
+    float noise = snoise(vec3(0.0, uv.y * 50.0, t)) * exp(-pow(abs(mod(t, 1.0) * 2.0 - 1.0), 2.0) * 20.0);
+    vec2 s = vec2((uv.x * 1.5) - 0.25 + (4.0 * noise * w), uv.y * 1.5 - 0.25);
+    vec3 color = vec3(0.0);
+    if(s.x < 1.0 && s.x > 0.0 && s.y < 1.0 && s.y > 0.0) {
+      color = texture2D(texture, s).rgb;
+    }
+    gl_FragColor = vec4(color, 1.0);
   }
   """;
 
@@ -46,6 +53,15 @@ class NoiseRenderer extends WebGLRenderer {
 
   List<GL.Framebuffer> fbo_list;
   List<GL.Texture> texture_list;
+  
+  List<ImageElement> images;
+  int current = -1;
+  
+  bool ready = false;
+  double last_updated;
+  double started;
+  
+  int frame = 0;
 
   void _initializeFBO() {
     this.fbo = gl.createFramebuffer();
@@ -99,10 +115,39 @@ class NoiseRenderer extends WebGLRenderer {
       1, 2, 3,
     ]));
     
-    this.texture = new WebGLCanvasTexture(gl, flip_y: true);
-    this.texture.load(gl, "pattern.png");
-
+    this.texture = new WebGLCanvasTexture(gl, flip_y: true, wrap_s: GL.CLAMP_TO_EDGE, wrap_t: GL.CLAMP_TO_EDGE, width: 512, height: 512);
     this._initializeFBO();
+    
+    var futures = new List<Future<ImageElement>>();
+    [
+     "image1.jpg",
+     "image2.jpg",
+     "image3.jpg",
+     "image4.jpg",
+     "image5.jpg",
+     "image6.jpg",
+     "image7.jpg",
+    ].forEach((url) {
+      ImageElement img = document.createElement("img");
+      
+      img.src = url;
+      if(img.complete) {
+        futures.add(new Future<ImageElement>.value(img));
+        return;
+      }
+      
+      var completer = new Completer<ImageElement>();
+      img.onLoad.listen((Event event){
+        completer.complete(img);
+      });
+      futures.add(completer.future);
+      return;
+    });
+    
+    Future.wait(futures).then((List<ImageElement> images){
+      this.images = images;
+      this.ready = true;
+    });
   }
 
   NoiseRenderer(int width, int height) {
@@ -119,19 +164,29 @@ class NoiseRenderer extends WebGLRenderer {
   }
 
   void render(double ms) {
-    Matrix4 mvp = new Matrix4.identity();
+    if(!ready) {
+      return;
+    }
 
+    if(frame == 512) {
+      last_updated = ms;
+      current = (current + 1) % images.length;
+      texture.ctx.drawImage(images[current], 0, 0);
+      texture.refresh(gl);
+    }
+    
     gl.bindFramebuffer(GL.FRAMEBUFFER, null);
     gl.viewport(0, 0, this.dom.width, this.dom.height);
     gl.useProgram(this.program);
     gl.enable(GL.DEPTH_TEST);
     gl.clearColor(0.5, 0.5, 0.5, 1.0);
 
-    this.setUniformTexture0("texture", this.texture.texture);
-    this.setAttributeFloat3("position", this.position_buffer.buffer);
-    this.setUniformFloat("t", ms * 0.001);
+    setUniformTexture0("texture", texture.texture);
+    setAttributeFloat3("position", position_buffer.buffer);
+    setUniformFloat("t", frame * 0.001);
     gl.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
-    gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, this.index_buffer.buffer);
-    gl.drawElements(GL.TRIANGLES, this.index_buffer.data.length, GL.UNSIGNED_SHORT, 0);
+    gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, index_buffer.buffer);
+    gl.drawElements(GL.TRIANGLES, index_buffer.data.length, GL.UNSIGNED_SHORT, 0);
+    frame = (frame + 16) % 1024;
   }
 }
