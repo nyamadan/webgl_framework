@@ -64,7 +64,7 @@ class MMD_Renderer extends WebGLRenderer {
 
   bool enable_edge_shader = true;
   bool enable_deferred_shader = true;
-  bool enable_sraa = true;
+  bool enable_sraa = false;
   bool play = true;
 
   WebGLFBO fbo;
@@ -140,7 +140,7 @@ class MMD_Renderer extends WebGLRenderer {
 
     String model_file = "model/夕立改二（B式）1.01.pmx";
     //String model_file = "model/miku.pmd";
-    String motion_file = "motion/kishimen.vmd";
+    String motion_file = "motion/nyantwo.vmd";
 
     this._loadMesh(model_file);
     this._loadVMD(motion_file);
@@ -581,15 +581,15 @@ class MMD_Renderer extends WebGLRenderer {
     }
 
     if (this.play) {
-      this.frame = ((elapsed - start) / 30.0).round() % 750;
+      this.frame = ((elapsed - start) / 30.0).round() % 2600;
     }
 
     Matrix4 projection = new Matrix4.identity();
     setPerspectiveMatrix(projection, Math.PI * 60.0 / 180.0, this.aspect, 1.0, 100.0);
 
     Matrix4 view = new Matrix4.identity();
-    Vector3 look_from = new Vector3(0.0, 0.0, 5.0 + 45.0 * this.trackball.value);
-    setViewMatrix(view, look_from, new Vector3(0.0, 0.0, 0.0), new Vector3(0.0, 1.0, 0.0));
+    Vector3 look_from = new Vector3(0.0, 15.0, 5.0 + 45.0 * this.trackball.value);
+    setViewMatrix(view, look_from, new Vector3(0.0, 15.0, 0.0), new Vector3(0.0, 1.0, 0.0));
 
     Matrix4 rot = new Matrix4.identity();
     rot.setRotation(this.trackball.rotation.asRotationMatrix());

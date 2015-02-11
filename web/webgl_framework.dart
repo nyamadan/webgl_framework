@@ -23,7 +23,7 @@ void main() {
     window.console.log('${rec.level.name}: ${rec.time}: ${rec.message}');
   });
 
-  var renderer = new MMD_Renderer(1024, 1024);
+  var renderer = new MMD_Renderer(512, 512);
 
   document.querySelector("body").append(renderer.dom);
 
@@ -50,7 +50,7 @@ void main() {
   frame_slider_element.onChange.listen((event){
     if(!renderer.play) {
       int frame_value = int.parse(frame_slider_element.value);
-      if(frame_value >= 0 && frame_value <= 750) {
+      if(frame_value >= 0 && frame_value <= 2600) {
         frame_element.value = frame_value.toString();
       }
     }
@@ -59,7 +59,7 @@ void main() {
   frame_element.onChange.listen((event){
     if(!renderer.play) {
       int frame_value = int.parse(frame_element.value);
-      if(frame_value >= 0 && frame_value <= 750) {
+      if(frame_value >= 0 && frame_value <= 2600) {
         frame_slider_element.value = frame_value.toString();
       }
     }
